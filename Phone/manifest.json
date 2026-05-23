@@ -1,0 +1,44 @@
+{
+    "name": "VPhone",
+    "short_name": "VPhone",
+    "id": "com.innovateasterisk.browserphone",
+    "start_url": "index.html",
+    "scope": "./",
+    "display": "standalone",
+    "display_override": [
+        "standalone"
+    ],
+    "orientation": "portrait-primary",
+    "launch_handler": {
+        "client_mode": "navigate-existing"
+    },
+    "window": {
+        "width": 250,
+        "height": 425
+    },
+    "background_color": "#fff",
+    "theme_color": "#f6f6f6",
+    "description": "VPhone is a fully featured browser based WebRTC SIP phone for Asterisk. Designed to work with Asterisk PBX.",
+    "screenshots": [
+        {
+            "src": "icons/screenshot1.webp",
+            "type": "image/webp",
+            "sizes": "2542x1860",
+            "label": "Innovate Asterisk"
+        },
+        {
+            "src": "icons/screenshot2.webp",
+            "type": "image/webp",
+            "sizes": "2542x1860",
+            "label": "Innovate Asterisk"
+        }
+    ],
+    "icons": [
+        {
+            "src": "icons/phone-256x256.ico",
+            "sizes": "any",
+            "type": "image/x-icon",
+            "purpose": "any maskable"
+        }
+    ]
+}

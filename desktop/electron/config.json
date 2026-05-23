@@ -1,0 +1,48 @@
+{
+  "mount": {},
+  "phone": {
+    "Wss": true,
+    "wssServer": "",
+    "WebSocketPort": "",
+    "ServerPath": "/ws",
+    "SipDomain": "",
+    "SipUsername": "",
+    "SipPassword": "",
+    "SipPasswordType": "plain",
+    "Language": "vi",
+    "MediaConfig": {
+        "ringtone": "",
+        "holdMusic": "",
+        "busy": "",
+        "callWaiting": "",
+        "congestion": "",
+        "earlyMedia": ""
+    },
+    "NotificationsActive": false,
+    "EnableNotificationSettings": false,
+    "TransportReconnectionAttempts": 999,
+    "TransportReconnectionTimeout": 3,
+    "HideSettingsButton": false,
+    "MaxDidLength": 24,
+    "EnableVideoCalling": false,
+    "EnableTransfer": true,
+    "EnableConference": true,
+    "EnableTextMessaging": false,
+    "RecordAllCalls": false,
+    "CallRecordingPolicy": "allow",
+    "AutoAnswerPolicy": "allow",
+    "DoNotDisturbPolicy": "allow",
+    "CallWaitingPolicy": "allow",
+    "KeyboardShortcuts": {
+      "answer": "Alt+A",
+      "hangup": "Alt+C",
+      "hold": "Alt+H",
+      "mute": "Alt+M",
+      "transfer": "Alt+T",
+      "dialpad": "F9"
+    },
+    "DisableBuddies": false,
+    "DisableFreeDial": false,
+    "IceStunServerJson": ""
+  }
+}

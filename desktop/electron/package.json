@@ -1,0 +1,116 @@
+{
+  "name": "vphone",
+  "version": "1.1.1",
+  "private": true,
+  "description": "VPhone - VoIP softphone application",
+  "main": "main.js",
+  "scripts": {
+    "build:widget": "node scripts/build-widget.cjs",
+    "start": "electron .",
+    "test:register": "node scripts/register-smoke.cjs",
+    "package": "pnpm run build:widget && electron-builder --dir",
+    "dist": "pnpm run build:widget && electron-builder",
+    "dist:win": "electron-builder --win",
+    "dist:nsis": "pnpm run build:widget && electron-builder --win nsis",
+    "dist:portable": "pnpm run build:widget && electron-builder --win portable",
+    "dist:mac": "electron-builder --mac"
+  },
+  "vphone": {
+    "buildLanguages": [
+      "en",
+      "vi"
+    ],
+    "desktop": {
+      "mount": {
+        "width": "250px",
+        "height": "425px",
+        "title": "VPhone",
+        "showStatus": false,
+        "windowIcon": "icons/win/icon.ico",
+        "trayIcon": "icons/win/icon.ico"
+      },
+      "phone": {
+        "AppIcon": "icons/png/128x128.png",
+        "NotificationIcon": "icons/png/128x128.png",
+        "DefaultProfileIcon": "icons/png/128x128.png"
+      }
+    }
+  },
+  "build": {
+    "appId": "com.vphone.app",
+    "productName": "VPhone",
+    "executableName": "VPhone",
+    "copyright": "Copyright © 2026 VPhone",
+    "asar": true,
+    "npmRebuild": false,
+    "buildDependenciesFromSource": false,
+    "afterPack": "scripts/prune-locales.cjs",
+    "directories": {
+      "output": "release"
+    },
+    "win": {
+      "icon": "icons/win/icon.ico",
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "mac": {
+      "icon": "icons/mac/icon.icns",
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.productivity"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowElevation": false,
+      "allowToChangeInstallationDirectory": true,
+      "displayLanguageSelector": true,
+      "installerIcon": "icons/win/icon.ico",
+      "uninstallerIcon": "icons/win/icon.ico",
+      "installerHeaderIcon": "icons/win/icon.ico",
+      "installerLanguages": [
+        "vi_VN",
+        "en_US"
+      ],
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "files": [
+      "**/*",
+      "!.env",
+      "!.env.*",
+      "!*.log",
+      "!release/**",
+      "!**/*.map",
+      "!playwright"
+    ],
+    "extraResources": [
+      {
+        "from": "../../lib/vphone.min.js",
+        "to": "lib/vphone.min.js"
+      },
+      {
+        "from": "../../lib/vphone-widget.min.js",
+        "to": "lib/vphone-widget.min.js"
+      }
+    ],
+    "extraMetadata": {
+      "main": "main.js"
+    }
+  },
+  "devDependencies": {
+    "electron": "^41.2.1",
+    "electron-builder": "^26.0.12",
+    "playwright": "^1.60.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "electron",
+      "electron-builder"
+    ]
+  }
+}

@@ -1,0 +1,102 @@
+{
+  "name": "vphone",
+  "version": "1.0.0",
+  "description": "A fully-featured WebRTC SIP phone library for embedding in web applications",
+  "main": "vphone.js",
+  "browser": "vphone.js",
+  "unpkg": "vphone.min.js",
+  "files": [
+    "vphone.js",
+    "react-native.js",
+    "vphone-widget.js",
+    "vphone.min.js",
+    "vphone-widget.min.js",
+    "dist/",
+    "src/",
+    "LIBRARY_API.md",
+    "README.md",
+    "CLICK_TO_CALL.md",
+    "EMBEDDED_UI_GUIDE.md"
+  ],
+  "exports": {
+    ".": {
+      "browser": "./vphone.js",
+      "require": "./vphone.js",
+      "default": "./vphone.js"
+    },
+    "./vphone": "./vphone.js",
+    "./widget": "./vphone-widget.js",
+    "./vphone.min": "./vphone.min.js",
+    "./widget.min": "./vphone-widget.min.js",
+    "./core": {
+      "types": "./dist/vphone-sdk.d.ts",
+      "import": "./dist/vphone-sdk.mjs",
+      "require": "./dist/vphone-sdk.cjs"
+    },
+    "./react-native": {
+      "types": "./dist/vphone-sdk.d.ts",
+      "import": "./dist/vphone-sdk.mjs",
+      "require": "./react-native.js"
+    },
+    "./sdk": {
+      "types": "./dist/vphone-sdk.d.ts",
+      "import": "./dist/vphone-sdk.mjs",
+      "require": "./dist/vphone-sdk.cjs"
+    }
+  },
+  "scripts": {
+    "build:ui": "node scripts/copy-phone-assets.js",
+    "build:embedded": "node scripts/build-embedded-ui.js",
+    "build:single": "node scripts/build-single-file.js",
+    "build:all": "npm run build:sdk && npm run build:single",
+    "build:release": "npm run build:sdk && npm run build:single",
+    "test": "node test/run-tests.cjs",
+    "build:sdk": "node scripts/build-sdk.js"
+  },
+  "keywords": [
+    "webrtc",
+    "sip",
+    "phone",
+    "embedding",
+    "widget",
+    "voip",
+    "calling",
+    "asterisk"
+  ],
+  "author": "Conrad de Wet",
+  "contributors": [
+    "Browser Phone Community"
+  ],
+  "license": "AGPL-3.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mvh97hg/vphone"
+  },
+  "bugs": {
+    "url": "https://github.com/mvh97hg/vphone/issues"
+  },
+  "homepage": "https://github.com/mvh97hg/vphone",
+  "engines": {
+    "browser": "*"
+  },
+  "peerDependencies": {
+    "sip.js": "^0.20.0"
+  },
+  "devDependencies": {
+    "moment": "^2.24.0",
+    "terser": "^5.46.1"
+  },
+  "libVersion": "1.0.0",
+  "appVersion": "0.3.34",
+  "features": {
+    "embedModes": [
+      "floating",
+      "inline"
+    ],
+    "internationalization": true,
+    "webrtc": true,
+    "sipSupport": true,
+    "progressiveWebApp": true,
+    "headlessSdk": true
+  }
+}
