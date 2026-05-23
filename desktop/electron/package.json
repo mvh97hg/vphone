@@ -1,19 +1,20 @@
 {
   "name": "vphone",
-  "version": "1.1.1",
+  "version": "26.05.23.1707",
   "private": true,
   "description": "VPhone - VoIP softphone application",
   "main": "main.js",
   "scripts": {
+    "set:version:build": "node scripts/set-build-version.cjs",
     "build:widget": "node scripts/build-widget.cjs",
     "start": "electron .",
     "test:register": "node scripts/register-smoke.cjs",
-    "package": "pnpm run build:widget && electron-builder --dir",
-    "dist": "pnpm run build:widget && electron-builder",
-    "dist:win": "electron-builder --win",
-    "dist:nsis": "pnpm run build:widget && electron-builder --win nsis",
-    "dist:portable": "pnpm run build:widget && electron-builder --win portable",
-    "dist:mac": "electron-builder --mac"
+    "package": "pnpm run set:version:build && pnpm run build:widget && electron-builder --dir",
+    "dist": "pnpm run set:version:build && pnpm run build:widget && electron-builder",
+    "dist:win": "pnpm run set:version:build && pnpm run build:widget && electron-builder --win",
+    "dist:nsis": "pnpm run set:version:build && pnpm run build:widget && electron-builder --win nsis",
+    "dist:portable": "pnpm run set:version:build && pnpm run build:widget && electron-builder --win portable",
+    "dist:mac": "pnpm run set:version:build && pnpm run build:widget && electron-builder --mac"
   },
   "vphone": {
     "buildLanguages": [

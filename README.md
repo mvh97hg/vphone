@@ -185,27 +185,6 @@ These keys are passed under `mount({ config: { ... } })`. Boolean values can be 
 | `HideSettingsButton` | `true` in embed | Hide settings entry in embedded mode. |
 | `HideRecordAllCallsButton` | `true` in embed | Hide record-all toggle in embedded mode. |
 
-## Keyboard Shortcuts
-
-Available shortcuts in the current UI:
-
-| Context | Shortcut | Action |
-| --- | --- | --- |
-| Dial input | `Enter` | Start an audio call. |
-| Dial input | `Ctrl+Enter` | Start a video call when video calling is enabled. |
-| Dial input | `0-9`, `*`, `#`, `+` | Enter dial digits. |
-| Dial input | `Backspace` / delete button | Remove the previous digit or selected digits. |
-| Chat input | `Enter` | Send the message. |
-| Chat input | `Shift+Enter` or `Ctrl+Enter` | Insert a line break. |
-| Popup menu | `Escape` | Close the menu. |
-| Global | `F2` | Answer the active inbound call. |
-| Global | `Escape` | Hang up, cancel, or reject the active inbound call. |
-| Global | `F4` | Toggle hold on the active call. |
-| Global | `F6` | Toggle mute on the active call. |
-| Global | `F8` | Toggle transfer mode on the active call. |
-| Global | `F9` | Open the dialpad tab. |
-
-Use `KeyboardShortcuts` in phone config to remap global shortcuts when a browser or operating system shortcut conflicts. Example: `KeyboardShortcuts: { answer: "F3", hangup: "Escape", hold: "F5", mute: "F7", transfer: "F10", dialpad: "F12" }`.
 
 ## Reconnect Behavior
 

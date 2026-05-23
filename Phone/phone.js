@@ -3,35 +3,7 @@ const sipjsversion = "0.20.0";
 const navUserAgent = window.navigator.userAgent;
 const instanceID = String(Date.now());
 const localDB = window.localStorage;
-let welcomeScreen = "<div class=\"UiWindowField\"><pre style=\"font-size: 12px\">";
-welcomeScreen += "===========================================================================\n";
-welcomeScreen += "Copyright © 2020 - All Rights Reserved\n";
-welcomeScreen += "===========================================================================\n";
-welcomeScreen += "\n";
-welcomeScreen += "                            NO WARRANTY\n";
-welcomeScreen += "\n";
-welcomeScreen += "BECAUSE THE PROGRAM IS LICENSED FREE OF CHARGE, THERE IS NO WARRANTY\n";
-welcomeScreen += "FOR THE PROGRAM, TO THE EXTENT PERMITTED BY APPLICABLE LAW.  EXCEPT WHEN\n";
-welcomeScreen += "OTHERWISE STATED IN WRITING THE COPYRIGHT HOLDERS AND/OR OTHER PARTIES\n";
-welcomeScreen += "PROVIDE THE PROGRAM \"AS IS\" WITHOUT WARRANTY OF ANY KIND, EITHER EXPRESSED\n";
-welcomeScreen += "OR IMPLIED, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF\n";
-welcomeScreen += "MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.  THE ENTIRE RISK AS\n";
-welcomeScreen += "TO THE QUALITY AND PERFORMANCE OF THE PROGRAM IS WITH YOU.  SHOULD THE\n";
-welcomeScreen += "PROGRAM PROVE DEFECTIVE, YOU ASSUME THE COST OF ALL NECESSARY SERVICING,\n";
-welcomeScreen += "REPAIR OR CORRECTION.\n";
-welcomeScreen += "\n";
-welcomeScreen += "IN NO EVENT UNLESS REQUIRED BY APPLICABLE LAW OR AGREED TO IN WRITING\n";
-welcomeScreen += "WILL ANY COPYRIGHT HOLDER, OR ANY OTHER PARTY WHO MAY MODIFY AND/OR\n";
-welcomeScreen += "REDISTRIBUTE THE PROGRAM AS PERMITTED ABOVE, BE LIABLE TO YOU FOR DAMAGES,\n";
-welcomeScreen += "INCLUDING ANY GENERAL, SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES ARISING\n";
-welcomeScreen += "OUT OF THE USE OR INABILITY TO USE THE PROGRAM (INCLUDING BUT NOT LIMITED\n";
-welcomeScreen += "TO LOSS OF DATA OR DATA BEING RENDERED INACCURATE OR LOSSES SUSTAINED BY\n";
-welcomeScreen += "YOU OR THIRD PARTIES OR A FAILURE OF THE PROGRAM TO OPERATE WITH ANY OTHER\n";
-welcomeScreen += "PROGRAMS), EVEN IF SUCH HOLDER OR OTHER PARTY HAS BEEN ADVISED OF THE\n";
-welcomeScreen += "POSSIBILITY OF SUCH DAMAGES.\n";
-welcomeScreen += "\n";
-welcomeScreen += "============================================================================\n</pre>";
-welcomeScreen += "</div>";
+
 let loadAlternateLang = (getDbItem("loadAlternateLang", "1") == "1");
 const availableLang = ["vi", "he", "fr", "ja", "zh-hans", "zh", "ru", "tr", "nl", "es", "de", "pl", "pt-br"];
 let imagesDirectory = getDbItem("imagesDirectory", "");
@@ -66,7 +38,7 @@ let SubscribeVoicemailExpires = parseInt(getDbItem("SubscribeVoicemailExpires", 
 let ContactUserName = getDbItem("ContactUserName", "");
 let userAgentStr = getDbItem("UserAgentStr", "VPhone "+ appversion +" (SIPJS - "+ sipjsversion +") "+ navUserAgent);
 let hostingPrefix = getDbItem("HostingPrefix", "");
-let AppIcon = getDbItem("AppIcon", "icons/phone.svg");
+let AppIcon = getDbItem("AppIcon", "icons/phone.ico");
 let NotificationIcon = getDbItem("NotificationIcon", "");
 let DefaultProfileIcon = getDbItem("DefaultProfileIcon", "");
 let RegisterExpires = parseInt(getDbItem("RegisterExpires", 300));
@@ -648,15 +620,59 @@ function ResolveRecentCallbackNumber(item, ownerBuddy){
 
     return "";
 }
-function GetRecentDisplayLabel(callbackNumber, ownerBuddy, contactBuddy, item, isOutbound){
-    if(contactBuddy && contactBuddy.CallerIDName && contactBuddy.CallerIDName != "") return contactBuddy.CallerIDName;
-    if(ownerBuddy && ownerBuddy.CallerIDName && ownerBuddy.CallerIDName != "") return ownerBuddy.CallerIDName;
+function NormalizeCallerDisplayText(value){
+    var text = String(value == null ? "" : value).trim();
+    if(text == "" || text == "null" || text == "undefined") return "";
+    return text;
+}
+function BuildCallerDisplay(number, contactName, callerIdName) {
+    var normalizedNumber = NormalizeCallerDisplayText(number);
+    var normalizedContactName = NormalizeCallerDisplayText(contactName);
+    var normalizedCallerIdName = NormalizeCallerDisplayText(callerIdName);
 
-    var partyLabel = isOutbound ? (item.DstDid || item.Dst || "") : (item.SrcDid || item.Src || "");
-    var sanitizedParty = SanitizePhoneSearch(partyLabel);
-    if(sanitizedParty != "") return sanitizedParty;
-    if(callbackNumber != "") return callbackNumber;
-    return partyLabel || "";
+    // Ignore invalid caller names
+    var invalidNames = ["anonymous", "unknown", "null", "undefined"];
+
+    if (invalidNames.includes(normalizedCallerIdName.toLowerCase())) {
+        normalizedCallerIdName = "";
+    }
+
+    var resolvedName = "";
+
+    // Priority 1: Contact name
+    if (normalizedContactName !== "") {
+        resolvedName = normalizedContactName;
+    }
+    // Priority 2: Caller ID name
+    else if (
+        normalizedCallerIdName !== "" &&
+        normalizedCallerIdName !== normalizedNumber
+    ) {
+        resolvedName = normalizedCallerIdName;
+    }
+
+    return {
+        number: normalizedNumber,
+        name: resolvedName,
+        primary: resolvedName || normalizedNumber,
+        secondary:
+            resolvedName &&
+            normalizedNumber &&
+            resolvedName !== normalizedNumber
+                ? normalizedNumber
+                : ""
+    };
+}
+function GetRecentDisplayInfo(callbackNumber, ownerBuddy, contactBuddy, item, isOutbound){
+    var contactName = (contactBuddy && contactBuddy.CallerIDName) ? contactBuddy.CallerIDName : "";
+    var partyCallerId = isOutbound ? (item.Dst || item.DstDid || "") : (item.Src || item.SrcDid || "");
+    var fallbackCallerId = (ownerBuddy && ownerBuddy.CallerIDName) ? ownerBuddy.CallerIDName : "";
+    var callerIdName = NormalizeCallerDisplayText(partyCallerId) || NormalizeCallerDisplayText(fallbackCallerId);
+
+    return BuildCallerDisplay(callbackNumber, contactName, callerIdName);
+}
+function GetRecentDisplayLabel(callbackNumber, ownerBuddy, contactBuddy, item, isOutbound){
+    return GetRecentDisplayInfo(callbackNumber, ownerBuddy, contactBuddy, item, isOutbound).primary;
 }
 function GetRecentDirection(item){
     return ((item.SrcUserId == profileUserID) || item.CallDirection == "outbound") ? "outbound" : "inbound";
@@ -719,13 +735,14 @@ function SearchRecentsByNumber(filter){
                 var contactBuddy = FindBuddyByNumber(callbackNumber);
                 if(contactBuddy && contactBuddy.type != "contact") contactBuddy = null;
 
-                var displayName = GetRecentDisplayLabel(callbackNumber, ownerBuddy, contactBuddy, item, isOutbound);
+                var displayInfo = GetRecentDisplayInfo(callbackNumber, ownerBuddy, contactBuddy, item, isOutbound);
 
                 allCdrs.push({
                     cdr: item,
                     ownerIdentity: ownerIdentity,
                     callbackNumber: callbackNumber,
-                    displayName: displayName,
+                    displayName: displayInfo.primary,
+                    displayNumber: displayInfo.secondary,
                     direction: GetRecentDirection(item),
                     dayKey: GetRecentDayKey(item),
                     canAddContact: (callbackNumber != "" && contactBuddy == null)
@@ -807,7 +824,7 @@ function GetBuddyDialNumber(buddyObj){
     return "";
 }
 function BuildCallDisplayInfo(lineObj){
-    if(!lineObj) return { number: "", name: "", label: "" };
+    if(!lineObj) return { number: "", name: "", primary: "", secondary: "" };
 
     var session = lineObj.SipSession;
     var direction = (session && session.data && session.data.calldirection) ? session.data.calldirection : "";
@@ -820,16 +837,19 @@ function BuildCallDisplayInfo(lineObj){
     }
     if(!remoteNumber || remoteNumber == "") remoteNumber = lineObj.DisplayNumber || "";
 
-    var resolvedName = "";
     var matchedBuddy = FindBuddyByNumber(remoteNumber);
-    if(matchedBuddy && matchedBuddy.CallerIDName && matchedBuddy.CallerIDName != "") resolvedName = matchedBuddy.CallerIDName;
-    else if(lineObj.BuddyObj && lineObj.BuddyObj.CallerIDName && lineObj.BuddyObj.CallerIDName != "") resolvedName = lineObj.BuddyObj.CallerIDName;
-    else if(lineObj.DisplayName && lineObj.DisplayName != "") resolvedName = lineObj.DisplayName;
+    if(matchedBuddy && matchedBuddy.type != "contact") matchedBuddy = null;
 
-    var label = remoteNumber;
-    if(resolvedName && resolvedName != "" && resolvedName != remoteNumber) label = remoteNumber + " - " + resolvedName;
+    var contactName = (matchedBuddy && matchedBuddy.CallerIDName) ? matchedBuddy.CallerIDName : "";
+    var sipCallerIdName = "";
+    if(session && session.remoteIdentity && session.remoteIdentity.displayName) {
+        sipCallerIdName = session.remoteIdentity.displayName;
+    }
+    if(!sipCallerIdName || sipCallerIdName == "") {
+        sipCallerIdName = lineObj.DisplayName || "";
+    }
 
-    return { number: remoteNumber, name: resolvedName, label: label };
+    return BuildCallerDisplay(remoteNumber, contactName, sipCallerIdName);
 }
 function RefreshLineDisplay(lineObj){
     if(!lineObj) return;
@@ -842,12 +862,12 @@ function RefreshLineDisplay(lineObj){
         lineObj.DisplayName = display.name;
     }
 
-    var title = (display.label && display.label != "") ? display.label : (display.number || lineObj.DisplayNumber || "");
+    var title = (display.primary && display.primary != "") ? display.primary : (display.number || lineObj.DisplayNumber || "");
     $("#line-" + lineObj.LineNumber + "-AnswerCall .callingDisplayName").text(title);
     $("#line-" + lineObj.LineNumber + "-progress .callingDisplayName").text(title);
     $("#line-" + lineObj.LineNumber + "-AudioCall .callingDisplayName").text(title);
 
-    var subtitle = (display.name && display.name != "" && display.name != display.number) ? display.name : "";
+    var subtitle = display.secondary || "";
     var sections = ["AnswerCall", "progress", "AudioCall"];
     for(var i = 0; i < sections.length; i++){
         var selector = "#line-" + lineObj.LineNumber + "-" + sections[i] + " .callingDisplayNumber";
@@ -2984,9 +3004,6 @@ function ReceiveCall(session) {
         if(buddyObj.type == "extension" && buddyObj.CallerIDName != callerID){
             UpdateBuddyCallerID(buddyObj, callerID);
         }
-        else if(buddyObj.type == "contact" && callerID != did && buddyObj.CallerIDName != callerID){
-            UpdateBuddyCallerID(buddyObj, callerID);
-        }
     }
 
     var startTime = moment.utc();
@@ -3151,8 +3168,13 @@ function ReceiveCall(session) {
     }
     if (NotificationsActive && "Notification" in window) {
         if (Notification.permission === "granted") {
+            var incomingDisplay = BuildCallDisplayInfo(lineObj);
+            var incomingCallerText = incomingDisplay.primary || did;
+            if(incomingDisplay.secondary && incomingDisplay.secondary != "") {
+                incomingCallerText += " <" + incomingDisplay.secondary + ">";
+            }
             var noticeOptions = {
-                body: lang.incoming_call_from +" " + callerID +" <"+ did +">",
+                body: lang.incoming_call_from +" " + incomingCallerText,
                 icon: getNotificationIconUrl()
             }
             var inComingCallNotification = new Notification(lang.incoming_call, noticeOptions);
@@ -4724,7 +4746,7 @@ function UnsubscribeBuddy(buddyObj) {
             }
         }
     }
-    stopSessionHoldMusic(session);
+    // stopSessionHoldMusic(session);
 }
 function VoicemailNotify(notification){
     if(notification.request.body.indexOf("Messages-Waiting:") > -1){
@@ -7756,11 +7778,13 @@ function GetRecentHistoryEntries(callbackNumber, ownerIdentity){
             var itemNumber = ResolveRecentCallbackNumber(item, ownerBuddy);
             if(targetNumber != "" && itemNumber != targetNumber) return;
             if(targetNumber == "" && ownerIdentity && ownerBuddy.identity != ownerIdentity) return;
+            var historyDisplay = GetRecentDisplayInfo(itemNumber, ownerBuddy, FindBuddyByNumber(itemNumber), item, GetRecentDirection(item) == "outbound");
             entries.push({
                 cdr: item,
                 ownerIdentity: ownerBuddy.identity,
                 callbackNumber: itemNumber,
-                displayName: GetRecentDisplayLabel(itemNumber, ownerBuddy, FindBuddyByNumber(itemNumber), item, GetRecentDirection(item) == "outbound")
+                displayName: historyDisplay.primary,
+                displayNumber: historyDisplay.secondary
             });
         });
     }
@@ -7784,6 +7808,9 @@ function BuildRecentHistoryList(callbackNumber, ownerIdentity){
             html += "<div class=recentHistoryItem>";
             html += "<span class=\"recentHistoryDirection "+ recentStatus.iconClass +"\"><i class=\"fa "+ GetRecentDirectionIcon(recentStatus.iconClass) +"\"></i></span>";
             html += "<span class=recentHistoryMain>"+ EscapeHtml(entry.displayName || entry.callbackNumber || "") +"</span>";
+            if(entry.displayNumber && entry.displayNumber != "") {
+                html += "<span class=recentHistoryMeta>"+ EscapeHtml(entry.displayNumber) +"</span>";
+            }
             html += "<span class=recentHistoryMeta>"+ EscapeHtml(dateTime) +"</span>";
             html += "</div>";
         });
@@ -7872,6 +7899,7 @@ function ShowRecentsTab(){
             var item = entry.cdr;
             var recentStatus = GetRecentCallStatus(item);
             var displayName = entry.displayName || "";
+            var displayNumber = entry.displayNumber || "";
             var callbackNumber = entry.callbackNumber || "";
             var recentDayKey = GetRecentDayKey(item);
             if(recentDayKey != lastRecentDayKey){
@@ -7879,10 +7907,10 @@ function ShowRecentsTab(){
                 lastRecentDayKey = recentDayKey;
             }
             var DateTime = FormatRecentLogTime(item);
-            var recentNumber = callbackNumber || displayName;
+            var recentNumber = displayNumber || callbackNumber || displayName;
             var compactStatusText = recentStatus.statusText;
             if(compactStatusText.length > 12) compactStatusText = compactStatusText.replace(/^Cuộc gọi\s+/i, "").replace(/^Call\s+/i, "");
-            var showExpandedNumber = (callbackNumber != "" && displayName != callbackNumber);
+            var showExpandedNumber = (recentNumber != "" && displayName != recentNumber);
             var addDisabled = entry.canAddContact ? "" : " disabled";
             var addTitle = entry.canAddContact ? ((lang && lang.add_contact) ? lang.add_contact : "Add Contact") : displayName;
             var recentIds = encodeURIComponent(JSON.stringify(entry.recentIds || [{ identity: entry.ownerIdentity, cdrId: item.CdrId }]));
@@ -7995,6 +8023,7 @@ function ClearAllContacts(){
         DoRemoveBuddy(identity);
     });
     ShowContacts();
+    UpdateBuddyList();
 }
 function ShowSortAnfFilter(){
     ShowDial();
