@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta
+    http-equiv="Content-Security-Policy"
+    content="default-src 'self' file: data: blob: https: wss:; script-src 'self' file: 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' file: data: blob: https:; media-src 'self' file: data: blob: https:; connect-src 'self' file: https: wss:;"
+  >
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>VPhone</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="desktop-titlebar" aria-label="Window controls">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <img class="desktop-logo" src="../icons/png/24x24.png" alt="VPhone logo" />
+        <span class="desktop-title">VPhone</span>
+      </div>
+      <div class="desktop-window-actions">
+        <button class="desktop-window-btn desktop-window-shortcuts" type="button" data-shortcuts-toggle aria-label="Show shortcuts" title="Phim tat">?</button>
+        <button class="desktop-window-btn" type="button" data-window-action="minimize" aria-label="Minimize">−</button>
+        <button class="desktop-window-btn desktop-window-close" type="button" data-window-action="close" aria-label="Close">×</button>
+      </div>
+    </header>
+
+    <section id="desktop-shortcuts-popup" class="desktop-shortcuts-popup" role="dialog" aria-modal="true" aria-labelledby="desktop-shortcuts-title" hidden>
+      <div class="desktop-shortcuts-backdrop" data-shortcuts-close></div>
+      <div class="desktop-shortcuts-card">
+        <div class="desktop-shortcuts-header">
+          <h2 id="desktop-shortcuts-title">Các phím tắt</h2>
+          <button class="desktop-shortcuts-close" type="button" data-shortcuts-close aria-label="Dong">×</button>
+        </div>
+        <div id="desktop-shortcuts-list" class="desktop-shortcuts-list"></div>
+      </div>
+    </section>
+
+    <section id="phone-panel" class="phone-panel" tabindex="-1" aria-label="VPhone panel"></section>
+
+    <section id="desktop-error" class="error-card" hidden></section>
+  </main>
+
+  <script src="./renderer.js"></script>
+</body>
+</html>
