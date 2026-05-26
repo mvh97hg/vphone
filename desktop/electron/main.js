@@ -24,6 +24,14 @@ const LOG_MAX_BACKUPS = 5;
 
 app.setName("VPhone");
 
+// Optimize Electron process count and memory consumption (without disabling GPU for video calling)
+app.commandLine.appendSwitch("renderer-process-limit", "1");
+app.commandLine.appendSwitch("process-per-site");
+app.commandLine.appendSwitch("disable-background-networking");
+app.commandLine.appendSwitch("disable-default-apps");
+app.commandLine.appendSwitch("disable-sync");
+app.commandLine.appendSwitch("js-flags", "--max-old-space-size=128");
+
 if (process.env.VPHONE_DESKTOP_USER_DATA) {
   app.setPath("userData", process.env.VPHONE_DESKTOP_USER_DATA);
 }

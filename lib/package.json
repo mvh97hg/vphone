@@ -8,7 +8,6 @@
   "files": [
     "vphone.js",
     "react-native.js",
-    "vphone-widget.js",
     "vphone.min.js",
     "dist/",
     "src/",
@@ -24,7 +23,7 @@
       "default": "./vphone.js"
     },
     "./vphone": "./vphone.js",
-    "./widget": "./vphone-widget.js",
+    "./widget": "./vphone.js",
     "./vphone.min": "./vphone.min.js",
     "./widget.min": "./vphone.min.js",
     "./core": {

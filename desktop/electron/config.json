@@ -24,7 +24,7 @@
     "TransportReconnectionTimeout": 3,
     "HideSettingsButton": false,
     "MaxDidLength": 24,
-    "EnableVideoCalling": false,
+    "EnableVideoCalling": true,
     "EnableTransfer": true,
     "EnableConference": true,
     "EnableTextMessaging": false,
