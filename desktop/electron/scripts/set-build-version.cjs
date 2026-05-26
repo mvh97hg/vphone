@@ -17,19 +17,27 @@ function buildVersion(now) {
   return `${year}.${month}.${day}.${hour}${minute}`;
 }
 
+function buildSemver(now) {
+  const year = now.getFullYear() % 100;
+  const month = now.getMonth() + 1;
+  const day = now.getDate();
+  return `${year}.${month}.${day}`;
+}
+
 function main() {
   const pkgRaw = fs.readFileSync(packageJsonPath, "utf8");
   const pkg = JSON.parse(pkgRaw);
-  const nextVersion = buildVersion(new Date());
+  const now = new Date();
+  const displayVersion = buildVersion(now);
+  const semverVersion = buildSemver(now);
 
-  if (pkg.version === nextVersion) {
-    console.log(`[set-build-version] version unchanged: ${nextVersion}`);
-    return;
-  }
+  pkg.version = semverVersion;
+  pkg.build = pkg.build || {};
+  pkg.build.artifactName = `${pkg.build.productName || "VPhone"} Setup ${displayVersion}.${"${ext}"}`;
 
-  pkg.version = nextVersion;
   fs.writeFileSync(packageJsonPath, `${JSON.stringify(pkg, null, 2)}\n`, "utf8");
-  console.log(`[set-build-version] version updated: ${nextVersion}`);
+  console.log(`[set-build-version] app version: ${semverVersion}`);
+  console.log(`[set-build-version] artifact version: ${displayVersion}`);
 }
 
 main();

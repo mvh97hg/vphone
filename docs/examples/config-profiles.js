@@ -15,7 +15,7 @@ const PhoneConfigProfiles = {
      * Bare minimum settings for a basic phone widget
      */
     minimal: {
-        phoneUrl: 'phone/index.html',
+        phoneUrl: 'src/ui/index.html',
         floating: true,
         mountOptions: {
             title: 'Phone',
@@ -31,7 +31,7 @@ const PhoneConfigProfiles = {
      * Professional floating widget for web applications
      */
     standardFloating: {
-        phoneUrl: 'phone/index.html',
+        phoneUrl: 'src/ui/index.html',
         floating: true,
         width: '300px',
         height: '500px',
@@ -52,7 +52,7 @@ const PhoneConfigProfiles = {
      * Phone embedded directly in page layout
      */
     standardInline: {
-        phoneUrl: 'phone/index.html',
+        phoneUrl: 'src/ui/index.html',
         floating: false,
         container: '#phone-container',
         width: '400px',
@@ -72,7 +72,7 @@ const PhoneConfigProfiles = {
      * Configuration optimized for contact center/call center environments
      */
     contactCenter: {
-        phoneUrl: 'phone/index.html',
+        phoneUrl: 'src/ui/index.html',
         floating: false,
         container: '#phone-panel',
         width: '100%',
@@ -104,7 +104,7 @@ const PhoneConfigProfiles = {
      * Full-featured enterprise deployment with security
      */
     enterprise: {
-        phoneUrl: 'phone/index.html',
+        phoneUrl: 'src/ui/index.html',
         floating: false,
         container: '#phone-widget',
         width: '450px',
@@ -150,7 +150,7 @@ const PhoneConfigProfiles = {
      * HIPAA-compliant configuration for healthcare environments
      */
     healthcare: {
-        phoneUrl: 'phone/index.html',
+        phoneUrl: 'src/ui/index.html',
         floating: false,
         container: '#healthcare-phone',
         width: '400px',
@@ -185,7 +185,7 @@ const PhoneConfigProfiles = {
      * Optimized for mobile and responsive web applications
      */
     mobileResponsive: {
-        phoneUrl: 'phone/index.html',
+        phoneUrl: 'src/ui/index.html',
         floating: true,
         width: '100vw',
         height: '100vh',
@@ -210,7 +210,7 @@ const PhoneConfigProfiles = {
      * Settings for development and testing environments
      */
     development: {
-        phoneUrl: 'phone/index.html',
+        phoneUrl: 'src/ui/index.html',
         floating: true,
         width: '350px',
         height: '550px',
@@ -239,7 +239,7 @@ const PhoneConfigProfiles = {
      */
     saas: function(tenantId, tenantConfig) {
         return {
-            phoneUrl: 'phone/index.html',
+            phoneUrl: 'src/ui/index.html',
             floating: true,
             width: '320px',
             height: '520px',
@@ -269,7 +269,7 @@ const PhoneConfigProfiles = {
      */
     complete: {
         // Mounting options
-        phoneUrl: 'phone/index.html',
+        phoneUrl: 'src/ui/index.html',
         floating: true,
         container: null,
         width: '320px',

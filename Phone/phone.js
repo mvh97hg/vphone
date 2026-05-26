@@ -36,7 +36,14 @@ let VoiceMailSubscribe = (getDbItem("VoiceMailSubscribe", "0") == "1");
 let VoicemailDid = getDbItem("VoicemailDid", "");
 let SubscribeVoicemailExpires = parseInt(getDbItem("SubscribeVoicemailExpires", 300));
 let ContactUserName = getDbItem("ContactUserName", "");
-let userAgentStr = getDbItem("UserAgentStr", "VPhone "+ appversion +" (SIPJS - "+ sipjsversion +") "+ navUserAgent);
+
+// Prefer UserAgentStr stored in config/localStorage. If not present, use default VPhone UA.
+var storedUA = getDbItem("UserAgentStr", null);
+if(storedUA && String(storedUA).trim() !== ""){
+    var userAgentStr = String(storedUA).trim();
+} else {
+    var userAgentStr = "VPhone " + appversion;
+}
 let hostingPrefix = getDbItem("HostingPrefix", "");
 let AppIcon = getDbItem("AppIcon", "icons/phone.ico");
 let NotificationIcon = getDbItem("NotificationIcon", "");

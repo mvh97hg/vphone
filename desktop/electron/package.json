@@ -1,6 +1,6 @@
 {
   "name": "vphone",
-  "version": "26.05.23.1707",
+  "version": "26.5.23",
   "private": true,
   "description": "VPhone - VoIP softphone application",
   "main": "main.js",
@@ -101,7 +101,8 @@
     ],
     "extraMetadata": {
       "main": "main.js"
-    }
+    },
+    "artifactName": "VPhone Setup 26.05.23.1720.${ext}"
   },
   "devDependencies": {
     "electron": "^41.2.1",

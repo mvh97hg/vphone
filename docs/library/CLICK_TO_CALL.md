@@ -52,7 +52,7 @@ Configuration object for the call.
 ```javascript
 // Get phone instance
 var phone = Vphone.mount({
-    phoneUrl: 'Phone/index.html',
+    phoneUrl: 'src/ui/index.html',
     floating: true,
     config: { /* ... */ }
 });
@@ -102,7 +102,7 @@ phone.clickToCall('5551234567', {
 <script src="lib/vphone.js"></script>
 <script>
     var phone = Vphone.mount({
-        phoneUrl: 'Phone/index.html',
+        phoneUrl: 'src/ui/index.html',
         floating: true,
         config: { /* ... */ }
     });

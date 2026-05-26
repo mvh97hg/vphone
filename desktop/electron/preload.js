@@ -22,3 +22,30 @@ contextBridge.exposeInMainWorld('VPhoneDesktop', {
     };
   }
 });
+
+// Inject a default UserAgent string into localStorage so renderer `phone.js` can pick it up
+(async function injectUserAgent(){
+  try{
+    // Try to get app config from main (may include appversion)
+    let cfg = {};
+    try{ cfg = await ipcRenderer.invoke('vphone-desktop:get-config'); } catch(e) { cfg = {}; }
+
+    const electronVer = (process && process.versions && process.versions.electron) ? String(process.versions.electron) : "";
+    // Prefer explicit UserAgentStr from config if present
+    var cfgUA = (cfg && (cfg.UserAgentStr || cfg.userAgentStr || cfg.userAgent)) ? (cfg.UserAgentStr || cfg.userAgentStr || cfg.userAgent) : null;
+    var ua = "";
+    if(cfgUA && String(cfgUA).trim() !== "") {
+      ua = String(cfgUA).trim();
+    } else {
+      const appVer = (cfg && cfg.appversion) ? String(cfg.appversion) : "";
+      ua = "VPhone";
+      if(appVer && appVer !== "") ua += " " + appVer;
+    }
+
+    if(ua && window && window.localStorage){
+      try{ window.localStorage.setItem('UserAgentStr', ua); }
+      catch(e) { /* ignore storage errors */ }
+    }
+  }
+  catch(e){ /* swallow preload errors */ }
+})();

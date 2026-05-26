@@ -24,7 +24,7 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 coverage/
-
+.codex/
 # Node / npm local artifacts
 dist/
 node_modules/

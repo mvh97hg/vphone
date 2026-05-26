@@ -687,7 +687,7 @@
 &lt;!-- Mount widget --&gt;<br/>
 &lt;script&gt;<br/>
 &nbsp;&nbsp;var phone = Vphone.mount({<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;phoneUrl: 'phone/index.html',<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;phoneUrl: 'src/ui/index.html',<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;floating: true,<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;startCollapsed: true,<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;expandOnIncomingCall: true,<br/>
@@ -714,7 +714,7 @@
 &lt;script&gt;<br/>
 &nbsp;&nbsp;var phone = Vphone.mount({<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;container: '#phone-widget',<br/>
-&nbsp;&nbsp;&nbsp;&nbsp;phoneUrl: 'phone/index.html',<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;phoneUrl: 'src/ui/index.html',<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;width: '400px',<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;height: '600px',<br/>
 &nbsp;&nbsp;&nbsp;&nbsp;config: {<br/>
@@ -729,7 +729,7 @@
                 <h3>Advanced Configuration & Events</h3>
                 <div class="code-block">
 var phone = Vphone.mount({<br/>
-&nbsp;&nbsp;phoneUrl: 'phone/index.html',<br/>
+&nbsp;&nbsp;phoneUrl: 'src/ui/index.html',<br/>
 &nbsp;&nbsp;floating: true,<br/>
 &nbsp;&nbsp;<br/>
 &nbsp;&nbsp;// Event callbacks<br/>
@@ -795,7 +795,7 @@ phone.setStatus(true, 'Available');<br/>
             };
 
             floatingPhone = Vphone.mount({
-                phoneUrl: '../Phone/index.html',
+                phoneUrl: '../src/ui/index.html',
                 floating: true,
                 HideSettingsButton: false,
                 Language: 'vi',
@@ -860,7 +860,7 @@ phone.setStatus(true, 'Available');<br/>
 
             inlinePhone = Vphone.mount({
                 container: '#phone-inline-container',
-                phoneUrl: '../Phone/index.html',
+                phoneUrl: '../src/ui/index.html',
                 width: document.getElementById('inlineWidth').value,
                 height: document.getElementById('inlineHeight').value,
                 showStatus: document.getElementById('inlineShowStatus').checked,

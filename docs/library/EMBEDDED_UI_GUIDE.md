@@ -188,7 +188,7 @@ A: Verify `wssServer`, `WebSocketPort`, and `ServerPath` are correct. Check PBX 
 A: You can still point to external Phone UI:
 ```javascript
 Vphone.mount({
-    phoneUrl: 'https://cdn.example.com/phone/index.html',
+    phoneUrl: 'https://cdn.example.com/src/ui/index.html',
     floating: true
     // ...
 });

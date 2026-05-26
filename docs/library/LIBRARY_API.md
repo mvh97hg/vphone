@@ -56,7 +56,7 @@ The package exports:
 <!-- Use it -->
 <script>
   var phone = Vphone.mount({
-    phoneUrl: 'phone/index.html',
+    phoneUrl: 'src/ui/index.html',
     floating: true
   });
 </script>
@@ -70,7 +70,7 @@ The package exports:
 const Vphone = require('vphone');
 
 const phone = Vphone.mount({
-  phoneUrl: '/phone/index.html',
+  phoneUrl: '/src/ui/index.html',
   floating: true
 });
 ```
@@ -81,7 +81,7 @@ const phone = Vphone.mount({
 import Vphone from 'vphone';
 
 const phone = Vphone.mount({
-  phoneUrl: '/phone/index.html',
+  phoneUrl: '/src/ui/index.html',
   floating: true
 });
 ```
@@ -194,7 +194,7 @@ If you prefer to use an external Phone URL instead of embedded:
 
 ```javascript
 Vphone.mount({
-    phoneUrl: 'http://your-server.com/phone/index.html',
+    phoneUrl: 'http://your-server.com/src/ui/index.html',
     floating: true,
     config: { /* ... */ }
 });
@@ -256,7 +256,7 @@ bridge now, and to a native SIP/WebRTC adapter later.
 import { createPhoneClient, createIframeBridgeAdapter } from 'vphone/sdk';
 import Vphone from 'vphone/widget';
 
-const widget = Vphone.mount({ phoneUrl: '/Phone/index.html', floating: true });
+const widget = Vphone.mount({ phoneUrl: '/src/ui/index.html', floating: true });
 const phone = createPhoneClient(config, {
   adapter: createIframeBridgeAdapter(widget)
 });
@@ -506,7 +506,7 @@ Called when the phone's registration status changes.
 **Example:**
 ```javascript
 Vphone.mount({
-  phoneUrl: 'phone/index.html',
+  phoneUrl: 'src/ui/index.html',
   onStatusChange: function(status) {
     console.log('Phone registered:', status.registered);
     console.log('Status text:', status.text);
@@ -542,7 +542,7 @@ Called on phone call-related events (incoming, answered, ended, etc.).
 **Example:**
 ```javascript
 Vphone.mount({
-  phoneUrl: 'phone/index.html',
+  phoneUrl: 'src/ui/index.html',
   onCallEvent: function(event) {
     switch(event.phase) {
       case 'incoming':
@@ -570,7 +570,7 @@ Pass phone-specific configuration via the `config` option:
 
 ```javascript
 Vphone.mount({
-  phoneUrl: 'phone/index.html',
+  phoneUrl: 'src/ui/index.html',
   config: {
     Language: 'en',
     WebSocketPort: 5066,
@@ -610,7 +610,7 @@ To use Vietnamese UI labels for media controls (Speaker, Microphone, Camera, Rin
 
 ```javascript
 Vphone.mount({
-  phoneUrl: 'phone/index.html',
+  phoneUrl: 'src/ui/index.html',
   config: {
     Language: 'vi',
 
@@ -645,7 +645,7 @@ Creates a draggable floating widget in the bottom-right corner of the page.
 
 ```javascript
 Vphone.mount({
-  phoneUrl: 'phone/index.html',
+  phoneUrl: 'src/ui/index.html',
   width: '300px',
   height: '500px',
   floating: true,
@@ -668,7 +668,7 @@ Embeds phone directly in a specific container element.
 
 ```javascript
 Vphone.mount({
-  phoneUrl: 'phone/index.html',
+  phoneUrl: 'src/ui/index.html',
   container: '#phone-container',
   width: '400px',
   height: '600px',
@@ -752,7 +752,7 @@ Build iframe URL with encoded configuration.
 
 ```javascript
 var url = Vphone.utils.buildIframeUrl(
-  'phone/index.html',
+  'src/ui/index.html',
   { Language: 'en' },
   'embed'
 );
@@ -829,7 +829,7 @@ var Vphone = Vphone.init({ debug: true });
 
   <script>
     var phone = Vphone.mount({
-      phoneUrl: 'phone/index.html'
+      phoneUrl: 'src/ui/index.html'
     });
   </script>
 </body>
@@ -858,7 +858,7 @@ var Vphone = Vphone.init({ debug: true });
   <script>
     var phone = Vphone.mount({
       container: '#phone-widget',
-      phoneUrl: 'phone/index.html',
+      phoneUrl: 'src/ui/index.html',
       width: '400px',
       height: '600px',
       config: {
@@ -884,7 +884,7 @@ var Vphone = Vphone.init({ debug: true });
 ```javascript
 // Mount floating widget
 var phone = Vphone.mount({
-  phoneUrl: 'phone/index.html',
+  phoneUrl: 'src/ui/index.html',
   startCollapsed: true
 });
 
@@ -920,13 +920,13 @@ window.addEventListener('beforeunload', function() {
 ```javascript
 // Create multiple phone instances
 var floatingPhone = Vphone.mount({
-  phoneUrl: 'phone/index.html',
+  phoneUrl: 'src/ui/index.html',
   floating: true
 });
 
 var inlinePhone = Vphone.mount({
   container: '#support-widget',
-  phoneUrl: 'phone/index.html',
+  phoneUrl: 'src/ui/index.html',
   width: '300px',
   height: '500px'
 });

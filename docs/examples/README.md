@@ -211,7 +211,7 @@ var phone = Vphone.mount(config);
 ```javascript
 {
     // Entry point to phone application
-    phoneUrl: 'phone/index.html',
+    phoneUrl: 'src/ui/index.html',
     
     // Mount mode
     floating: true,                  // Floating widget or inline
@@ -471,7 +471,7 @@ To test the examples:
 For questions about examples:
 - See `docs/library/LIBRARY_API.md` for complete API reference
 - Check `README.md` for project overview
-- Review `Phone/index.html` for phone application docs
+- Review `src/ui/index.html` for phone application docs
 
 ---
 
