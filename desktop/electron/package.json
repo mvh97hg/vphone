@@ -93,10 +93,6 @@
       {
         "from": "../../lib/vphone.min.js",
         "to": "lib/vphone.min.js"
-      },
-      {
-        "from": "../../lib/vphone-widget.min.js",
-        "to": "lib/vphone-widget.min.js"
       }
     ],
     "extraMetadata": {

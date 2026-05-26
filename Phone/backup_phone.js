@@ -1,113 +1,6 @@
-/**
- * VPhone Combined Dev Source
- */
-
-// File: 00_init_helpers.js
-/**
- * VPhone Init Helpers & Base Globals
- * Pure utility functions and core configurations required at the very start of initialization.
- */
-
-// 1. Core Config & LocalDB Definitions (Environment Safe)
 const appversion = "0.1.1";
 const instanceID = String(Date.now());
-const localDB = (typeof window !== 'undefined' && window.localStorage) 
-    ? window.localStorage 
-    : (typeof globalThis !== 'undefined' && globalThis.localDB ? globalThis.localDB : null);
-
-// 2. Helper Functions Definitions
-function normalizeBooleanFlag(value, defaultValue){
-    if(value === undefined || value === null || value === "") return !!defaultValue;
-    if(typeof value === "boolean") return value;
-    if(typeof value === "number") return value !== 0;
-    var normalized = String(value).toLowerCase().trim();
-    if(normalized === "false" || normalized === "0" || normalized === "no" || normalized === "off") return false;
-    if(normalized === "true" || normalized === "1" || normalized === "yes" || normalized === "on") return true;
-    return !!defaultValue;
-}
-
-function getDbItem(itemIndex, defaultValue){
-    if(localDB.getItem(itemIndex) != null) return localDB.getItem(itemIndex);
-    return defaultValue;
-}
-
-function IsMd5Hex32(value){
-    return /^[a-f0-9]{32}$/i.test(String(value || "").trim());
-}
-
-function NormalizeSipPasswordAndType(rawPassword, rawType){
-    var password = String(rawPassword || "").trim();
-    var type = String(rawType || "").toLowerCase().trim();
-    var prefixedMd5Match = password.match(/^(?:md5|ha1)\s*[:=]\s*([a-f0-9]{32})$/i);
-    if(prefixedMd5Match){
-        password = prefixedMd5Match[1];
-    }
-
-    var isMd5Hex = IsMd5Hex32(password);
-
-    if(type === "ha1" && isMd5Hex){
-        return { password: password.toLowerCase(), type: "ha1" };
-    }
-    if(type === "plain"){
-        return { password: password, type: "plain" };
-    }
-    if(type === "ha1" && !isMd5Hex){
-        return { password: password, type: "plain" };
-    }
-    if(isMd5Hex){
-        return { password: password.toLowerCase(), type: "ha1" };
-    }
-    return { password: password, type: "plain" };
-}
-
-function NormalizeKeyboardShortcuts(value){
-    var defaults = {
-        answer: "F2",
-        hangup: "Escape",
-        hold: "F4",
-        mute: "F6",
-        transfer: "F8",
-        dialpad: "F9"
-    };
-    var configured = {};
-    if(value && typeof value === "string"){
-        try {
-            configured = JSON.parse(value);
-        } catch(e){
-            configured = {};
-        }
-    }
-    else if(value && typeof value === "object"){
-        configured = value;
-    }
-    for(var key in defaults){
-        if(!Object.prototype.hasOwnProperty.call(defaults, key)) continue;
-        if(!configured[key]) configured[key] = defaults[key];
-        configured[key] = String(configured[key]).trim();
-    }
-    return configured;
-}
-
-// Global exports shim for backwards compatibility
-if (typeof globalThis !== 'undefined') { globalThis.appversion = appversion; }
-if (typeof window !== 'undefined') { window.appversion = appversion; }
-if (typeof globalThis !== 'undefined') { globalThis.instanceID = instanceID; }
-if (typeof window !== 'undefined') { window.instanceID = instanceID; }
-if (typeof globalThis !== 'undefined') { globalThis.localDB = localDB; }
-if (typeof window !== 'undefined') { window.localDB = localDB; }
-if (typeof globalThis !== 'undefined') { globalThis.normalizeBooleanFlag = normalizeBooleanFlag; }
-if (typeof window !== 'undefined') { window.normalizeBooleanFlag = normalizeBooleanFlag; }
-if (typeof globalThis !== 'undefined') { globalThis.getDbItem = getDbItem; }
-if (typeof window !== 'undefined') { window.getDbItem = getDbItem; }
-if (typeof globalThis !== 'undefined') { globalThis.IsMd5Hex32 = IsMd5Hex32; }
-if (typeof window !== 'undefined') { window.IsMd5Hex32 = IsMd5Hex32; }
-if (typeof globalThis !== 'undefined') { globalThis.NormalizeSipPasswordAndType = NormalizeSipPasswordAndType; }
-if (typeof window !== 'undefined') { window.NormalizeSipPasswordAndType = NormalizeSipPasswordAndType; }
-if (typeof globalThis !== 'undefined') { globalThis.NormalizeKeyboardShortcuts = NormalizeKeyboardShortcuts; }
-if (typeof window !== 'undefined') { window.NormalizeKeyboardShortcuts = NormalizeKeyboardShortcuts; }
-
-
-// File: 01_globals.js
+const localDB = window.localStorage;
 
 let loadAlternateLang = (getDbItem("loadAlternateLang", "1") == "1");
 const availableLang = ["vi", "he", "fr", "ja", "zh-hans", "zh", "ru", "tr", "nl", "es", "de", "pl", "pt-br"];
@@ -284,315 +177,15 @@ let mediaUploadLimits = {
 let audioAutoplayUnlocked = false;
 let audioUnlockAttached = false;
 let queuedAudioPlaybacks = [];
-
-// Global exports shim for backwards compatibility
-if (typeof globalThis !== 'undefined') { globalThis.loadAlternateLang = loadAlternateLang; }
-if (typeof window !== 'undefined') { window.loadAlternateLang = loadAlternateLang; }
-if (typeof globalThis !== 'undefined') { globalThis.availableLang = availableLang; }
-if (typeof window !== 'undefined') { window.availableLang = availableLang; }
-if (typeof globalThis !== 'undefined') { globalThis.imagesDirectory = imagesDirectory; }
-if (typeof window !== 'undefined') { window.imagesDirectory = imagesDirectory; }
-if (typeof globalThis !== 'undefined') { globalThis.wallpaperLight = wallpaperLight; }
-if (typeof window !== 'undefined') { window.wallpaperLight = wallpaperLight; }
-if (typeof globalThis !== 'undefined') { globalThis.wallpaperDark = wallpaperDark; }
-if (typeof window !== 'undefined') { window.wallpaperDark = wallpaperDark; }
-if (typeof globalThis !== 'undefined') { globalThis.profileUserID = profileUserID; }
-if (typeof window !== 'undefined') { window.profileUserID = profileUserID; }
-if (typeof globalThis !== 'undefined') { globalThis.profileName = profileName; }
-if (typeof window !== 'undefined') { window.profileName = profileName; }
-if (typeof globalThis !== 'undefined') { globalThis.wssServer = wssServer; }
-if (typeof window !== 'undefined') { window.wssServer = wssServer; }
-if (typeof globalThis !== 'undefined') { globalThis.WebSocketPort = WebSocketPort; }
-if (typeof window !== 'undefined') { window.WebSocketPort = WebSocketPort; }
-if (typeof globalThis !== 'undefined') { globalThis.ServerPath = ServerPath; }
-if (typeof window !== 'undefined') { window.ServerPath = ServerPath; }
-if (typeof globalThis !== 'undefined') { globalThis.Wss = Wss; }
-if (typeof window !== 'undefined') { window.Wss = Wss; }
-if (typeof globalThis !== 'undefined') { globalThis.SipDomain = SipDomain; }
-if (typeof window !== 'undefined') { window.SipDomain = SipDomain; }
-if (typeof globalThis !== 'undefined') { globalThis.SipUsername = SipUsername; }
-if (typeof window !== 'undefined') { window.SipUsername = SipUsername; }
-if (typeof globalThis !== 'undefined') { globalThis.SipPassword = SipPassword; }
-if (typeof window !== 'undefined') { window.SipPassword = SipPassword; }
-if (typeof globalThis !== 'undefined') { globalThis.SipPasswordType = SipPasswordType; }
-if (typeof window !== 'undefined') { window.SipPasswordType = SipPasswordType; }
-if (typeof globalThis !== 'undefined') { globalThis.RegistrationErrorText = RegistrationErrorText; }
-if (typeof window !== 'undefined') { window.RegistrationErrorText = RegistrationErrorText; }
-if (typeof globalThis !== 'undefined') { globalThis.normalizedSipAuth = normalizedSipAuth; }
-if (typeof window !== 'undefined') { window.normalizedSipAuth = normalizedSipAuth; }
-if (typeof globalThis !== 'undefined') { globalThis.SingleInstance = SingleInstance; }
-if (typeof window !== 'undefined') { window.SingleInstance = SingleInstance; }
-if (typeof globalThis !== 'undefined') { globalThis.TransportConnectionTimeout = TransportConnectionTimeout; }
-if (typeof window !== 'undefined') { window.TransportConnectionTimeout = TransportConnectionTimeout; }
-if (typeof globalThis !== 'undefined') { globalThis.TransportReconnectionAttempts = TransportReconnectionAttempts; }
-if (typeof window !== 'undefined') { window.TransportReconnectionAttempts = TransportReconnectionAttempts; }
-if (typeof globalThis !== 'undefined') { globalThis.TransportReconnectionTimeout = TransportReconnectionTimeout; }
-if (typeof window !== 'undefined') { window.TransportReconnectionTimeout = TransportReconnectionTimeout; }
-if (typeof globalThis !== 'undefined') { globalThis.TransportManualDisconnect = TransportManualDisconnect; }
-if (typeof window !== 'undefined') { window.TransportManualDisconnect = TransportManualDisconnect; }
-if (typeof globalThis !== 'undefined') { globalThis.SubscribeToYourself = SubscribeToYourself; }
-if (typeof window !== 'undefined') { window.SubscribeToYourself = SubscribeToYourself; }
-if (typeof globalThis !== 'undefined') { globalThis.VoiceMailSubscribe = VoiceMailSubscribe; }
-if (typeof window !== 'undefined') { window.VoiceMailSubscribe = VoiceMailSubscribe; }
-if (typeof globalThis !== 'undefined') { globalThis.VoicemailDid = VoicemailDid; }
-if (typeof window !== 'undefined') { window.VoicemailDid = VoicemailDid; }
-if (typeof globalThis !== 'undefined') { globalThis.SubscribeVoicemailExpires = SubscribeVoicemailExpires; }
-if (typeof window !== 'undefined') { window.SubscribeVoicemailExpires = SubscribeVoicemailExpires; }
-if (typeof globalThis !== 'undefined') { globalThis.ContactUserName = ContactUserName; }
-if (typeof window !== 'undefined') { window.ContactUserName = ContactUserName; }
-if (typeof globalThis !== 'undefined') { globalThis.userAgentStr = userAgentStr; }
-if (typeof window !== 'undefined') { window.userAgentStr = userAgentStr; }
-if (typeof globalThis !== 'undefined') { globalThis.hostingPrefix = hostingPrefix; }
-if (typeof window !== 'undefined') { window.hostingPrefix = hostingPrefix; }
-if (typeof globalThis !== 'undefined') { globalThis.AppIcon = AppIcon; }
-if (typeof window !== 'undefined') { window.AppIcon = AppIcon; }
-if (typeof globalThis !== 'undefined') { globalThis.NotificationIcon = NotificationIcon; }
-if (typeof window !== 'undefined') { window.NotificationIcon = NotificationIcon; }
-if (typeof globalThis !== 'undefined') { globalThis.DefaultProfileIcon = DefaultProfileIcon; }
-if (typeof window !== 'undefined') { window.DefaultProfileIcon = DefaultProfileIcon; }
-if (typeof globalThis !== 'undefined') { globalThis.RegisterExpires = RegisterExpires; }
-if (typeof window !== 'undefined') { window.RegisterExpires = RegisterExpires; }
-if (typeof globalThis !== 'undefined') { globalThis.RegisterExtraHeaders = RegisterExtraHeaders; }
-if (typeof window !== 'undefined') { window.RegisterExtraHeaders = RegisterExtraHeaders; }
-if (typeof globalThis !== 'undefined') { globalThis.RegisterExtraContactParams = RegisterExtraContactParams; }
-if (typeof window !== 'undefined') { window.RegisterExtraContactParams = RegisterExtraContactParams; }
-if (typeof globalThis !== 'undefined') { globalThis.RegisterContactParams = RegisterContactParams; }
-if (typeof window !== 'undefined') { window.RegisterContactParams = RegisterContactParams; }
-if (typeof globalThis !== 'undefined') { globalThis.WssInTransport = WssInTransport; }
-if (typeof window !== 'undefined') { window.WssInTransport = WssInTransport; }
-if (typeof globalThis !== 'undefined') { globalThis.IpInContact = IpInContact; }
-if (typeof window !== 'undefined') { window.IpInContact = IpInContact; }
-if (typeof globalThis !== 'undefined') { globalThis.BundlePolicy = BundlePolicy; }
-if (typeof window !== 'undefined') { window.BundlePolicy = BundlePolicy; }
-if (typeof globalThis !== 'undefined') { globalThis.IceStunServerJson = IceStunServerJson; }
-if (typeof window !== 'undefined') { window.IceStunServerJson = IceStunServerJson; }
-if (typeof globalThis !== 'undefined') { globalThis.IceStunCheckTimeout = IceStunCheckTimeout; }
-if (typeof window !== 'undefined') { window.IceStunCheckTimeout = IceStunCheckTimeout; }
-if (typeof globalThis !== 'undefined') { globalThis.SubscribeBuddyAccept = SubscribeBuddyAccept; }
-if (typeof window !== 'undefined') { window.SubscribeBuddyAccept = SubscribeBuddyAccept; }
-if (typeof globalThis !== 'undefined') { globalThis.SubscribeBuddyEvent = SubscribeBuddyEvent; }
-if (typeof window !== 'undefined') { window.SubscribeBuddyEvent = SubscribeBuddyEvent; }
-if (typeof globalThis !== 'undefined') { globalThis.SubscribeBuddyExpires = SubscribeBuddyExpires; }
-if (typeof window !== 'undefined') { window.SubscribeBuddyExpires = SubscribeBuddyExpires; }
-if (typeof globalThis !== 'undefined') { globalThis.ProfileDisplayPrefix = ProfileDisplayPrefix; }
-if (typeof window !== 'undefined') { window.ProfileDisplayPrefix = ProfileDisplayPrefix; }
-if (typeof globalThis !== 'undefined') { globalThis.ProfileDisplayPrefixSeparator = ProfileDisplayPrefixSeparator; }
-if (typeof window !== 'undefined') { window.ProfileDisplayPrefixSeparator = ProfileDisplayPrefixSeparator; }
-if (typeof globalThis !== 'undefined') { globalThis.InviteExtraHeaders = InviteExtraHeaders; }
-if (typeof window !== 'undefined') { window.InviteExtraHeaders = InviteExtraHeaders; }
-if (typeof globalThis !== 'undefined') { globalThis.NoAnswerTimeout = NoAnswerTimeout; }
-if (typeof window !== 'undefined') { window.NoAnswerTimeout = NoAnswerTimeout; }
-if (typeof globalThis !== 'undefined') { globalThis.KeyboardShortcuts = KeyboardShortcuts; }
-if (typeof window !== 'undefined') { window.KeyboardShortcuts = KeyboardShortcuts; }
-if (typeof globalThis !== 'undefined') { globalThis.AutoAnswerEnabled = AutoAnswerEnabled; }
-if (typeof window !== 'undefined') { window.AutoAnswerEnabled = AutoAnswerEnabled; }
-if (typeof globalThis !== 'undefined') { globalThis.DoNotDisturbEnabled = DoNotDisturbEnabled; }
-if (typeof window !== 'undefined') { window.DoNotDisturbEnabled = DoNotDisturbEnabled; }
-if (typeof globalThis !== 'undefined') { globalThis.CallWaitingEnabled = CallWaitingEnabled; }
-if (typeof window !== 'undefined') { window.CallWaitingEnabled = CallWaitingEnabled; }
-if (typeof globalThis !== 'undefined') { globalThis.RecordAllCalls = RecordAllCalls; }
-if (typeof window !== 'undefined') { window.RecordAllCalls = RecordAllCalls; }
-if (typeof globalThis !== 'undefined') { globalThis.StartVideoFullScreen = StartVideoFullScreen; }
-if (typeof window !== 'undefined') { window.StartVideoFullScreen = StartVideoFullScreen; }
-if (typeof globalThis !== 'undefined') { globalThis.SelectRingingLine = SelectRingingLine; }
-if (typeof window !== 'undefined') { window.SelectRingingLine = SelectRingingLine; }
-if (typeof globalThis !== 'undefined') { globalThis.UiMaxWidth = UiMaxWidth; }
-if (typeof window !== 'undefined') { window.UiMaxWidth = UiMaxWidth; }
-if (typeof globalThis !== 'undefined') { globalThis.UiThemeStyle = UiThemeStyle; }
-if (typeof window !== 'undefined') { window.UiThemeStyle = UiThemeStyle; }
-if (typeof globalThis !== 'undefined') { globalThis.UiMessageLayout = UiMessageLayout; }
-if (typeof window !== 'undefined') { window.UiMessageLayout = UiMessageLayout; }
-if (typeof globalThis !== 'undefined') { globalThis.UiCustomConfigMenu = UiCustomConfigMenu; }
-if (typeof window !== 'undefined') { window.UiCustomConfigMenu = UiCustomConfigMenu; }
-if (typeof globalThis !== 'undefined') { globalThis.UiCustomDialButton = UiCustomDialButton; }
-if (typeof window !== 'undefined') { window.UiCustomDialButton = UiCustomDialButton; }
-if (typeof globalThis !== 'undefined') { globalThis.UiCustomSortAndFilterButton = UiCustomSortAndFilterButton; }
-if (typeof window !== 'undefined') { window.UiCustomSortAndFilterButton = UiCustomSortAndFilterButton; }
-if (typeof globalThis !== 'undefined') { globalThis.UiCustomAddBuddy = UiCustomAddBuddy; }
-if (typeof window !== 'undefined') { window.UiCustomAddBuddy = UiCustomAddBuddy; }
-if (typeof globalThis !== 'undefined') { globalThis.UiCustomEditBuddy = UiCustomEditBuddy; }
-if (typeof window !== 'undefined') { window.UiCustomEditBuddy = UiCustomEditBuddy; }
-if (typeof globalThis !== 'undefined') { globalThis.UiCustomMediaSettings = UiCustomMediaSettings; }
-if (typeof window !== 'undefined') { window.UiCustomMediaSettings = UiCustomMediaSettings; }
-if (typeof globalThis !== 'undefined') { globalThis.UiCustomMessageAction = UiCustomMessageAction; }
-if (typeof window !== 'undefined') { window.UiCustomMessageAction = UiCustomMessageAction; }
-if (typeof globalThis !== 'undefined') { globalThis.TraceSip = TraceSip; }
-if (typeof window !== 'undefined') { window.TraceSip = TraceSip; }
-if (typeof globalThis !== 'undefined') { globalThis.HideSettingsButton = HideSettingsButton; }
-if (typeof window !== 'undefined') { window.HideSettingsButton = HideSettingsButton; }
-if (typeof globalThis !== 'undefined') { globalThis.HideRecordAllCallsButton = HideRecordAllCallsButton; }
-if (typeof window !== 'undefined') { window.HideRecordAllCallsButton = HideRecordAllCallsButton; }
-if (typeof globalThis !== 'undefined') { globalThis.AutoGainControl = AutoGainControl; }
-if (typeof window !== 'undefined') { window.AutoGainControl = AutoGainControl; }
-if (typeof globalThis !== 'undefined') { globalThis.EchoCancellation = EchoCancellation; }
-if (typeof window !== 'undefined') { window.EchoCancellation = EchoCancellation; }
-if (typeof globalThis !== 'undefined') { globalThis.NoiseSuppression = NoiseSuppression; }
-if (typeof window !== 'undefined') { window.NoiseSuppression = NoiseSuppression; }
-if (typeof globalThis !== 'undefined') { globalThis.MirrorVideo = MirrorVideo; }
-if (typeof window !== 'undefined') { window.MirrorVideo = MirrorVideo; }
-if (typeof globalThis !== 'undefined') { globalThis.maxFrameRate = maxFrameRate; }
-if (typeof window !== 'undefined') { window.maxFrameRate = maxFrameRate; }
-if (typeof globalThis !== 'undefined') { globalThis.videoHeight = videoHeight; }
-if (typeof window !== 'undefined') { window.videoHeight = videoHeight; }
-if (typeof globalThis !== 'undefined') { globalThis.MaxVideoBandwidth = MaxVideoBandwidth; }
-if (typeof window !== 'undefined') { window.MaxVideoBandwidth = MaxVideoBandwidth; }
-if (typeof globalThis !== 'undefined') { globalThis.videoAspectRatio = videoAspectRatio; }
-if (typeof window !== 'undefined') { window.videoAspectRatio = videoAspectRatio; }
-if (typeof globalThis !== 'undefined') { globalThis.NotificationsActive = NotificationsActive; }
-if (typeof window !== 'undefined') { window.NotificationsActive = NotificationsActive; }
-if (typeof globalThis !== 'undefined') { globalThis.StreamBuffer = StreamBuffer; }
-if (typeof window !== 'undefined') { window.StreamBuffer = StreamBuffer; }
-if (typeof globalThis !== 'undefined') { globalThis.MaxDataStoreDays = MaxDataStoreDays; }
-if (typeof window !== 'undefined') { window.MaxDataStoreDays = MaxDataStoreDays; }
-if (typeof globalThis !== 'undefined') { globalThis.MaxRecentRecords = MaxRecentRecords; }
-if (typeof window !== 'undefined') { window.MaxRecentRecords = MaxRecentRecords; }
-if (typeof globalThis !== 'undefined') { globalThis.PosterJpegQuality = PosterJpegQuality; }
-if (typeof window !== 'undefined') { window.PosterJpegQuality = PosterJpegQuality; }
-if (typeof globalThis !== 'undefined') { globalThis.VideoResampleSize = VideoResampleSize; }
-if (typeof window !== 'undefined') { window.VideoResampleSize = VideoResampleSize; }
-if (typeof globalThis !== 'undefined') { globalThis.RecordingVideoSize = RecordingVideoSize; }
-if (typeof window !== 'undefined') { window.RecordingVideoSize = RecordingVideoSize; }
-if (typeof globalThis !== 'undefined') { globalThis.RecordingVideoFps = RecordingVideoFps; }
-if (typeof window !== 'undefined') { window.RecordingVideoFps = RecordingVideoFps; }
-if (typeof globalThis !== 'undefined') { globalThis.RecordingLayout = RecordingLayout; }
-if (typeof window !== 'undefined') { window.RecordingLayout = RecordingLayout; }
-if (typeof globalThis !== 'undefined') { globalThis.DidLength = DidLength; }
-if (typeof window !== 'undefined') { window.DidLength = DidLength; }
-if (typeof globalThis !== 'undefined') { globalThis.MaxDidLength = MaxDidLength; }
-if (typeof window !== 'undefined') { window.MaxDidLength = MaxDidLength; }
-if (typeof globalThis !== 'undefined') { globalThis.DisplayDateFormat = DisplayDateFormat; }
-if (typeof window !== 'undefined') { window.DisplayDateFormat = DisplayDateFormat; }
-if (typeof globalThis !== 'undefined') { globalThis.DisplayTimeFormat = DisplayTimeFormat; }
-if (typeof window !== 'undefined') { window.DisplayTimeFormat = DisplayTimeFormat; }
-if (typeof globalThis !== 'undefined') { globalThis.Language = Language; }
-if (typeof window !== 'undefined') { window.Language = Language; }
-if (typeof globalThis !== 'undefined') { globalThis.BuddySortBy = BuddySortBy; }
-if (typeof window !== 'undefined') { window.BuddySortBy = BuddySortBy; }
-if (typeof globalThis !== 'undefined') { globalThis.SortByTypeOrder = SortByTypeOrder; }
-if (typeof window !== 'undefined') { window.SortByTypeOrder = SortByTypeOrder; }
-if (typeof globalThis !== 'undefined') { globalThis.BuddyAutoDeleteAtEnd = BuddyAutoDeleteAtEnd; }
-if (typeof window !== 'undefined') { window.BuddyAutoDeleteAtEnd = BuddyAutoDeleteAtEnd; }
-if (typeof globalThis !== 'undefined') { globalThis.HideAutoDeleteBuddies = HideAutoDeleteBuddies; }
-if (typeof window !== 'undefined') { window.HideAutoDeleteBuddies = HideAutoDeleteBuddies; }
-if (typeof globalThis !== 'undefined') { globalThis.BuddyShowExtenNum = BuddyShowExtenNum; }
-if (typeof window !== 'undefined') { window.BuddyShowExtenNum = BuddyShowExtenNum; }
-if (typeof globalThis !== 'undefined') { globalThis.DisableFreeDial = DisableFreeDial; }
-if (typeof window !== 'undefined') { window.DisableFreeDial = DisableFreeDial; }
-if (typeof globalThis !== 'undefined') { globalThis.DisableBuddies = DisableBuddies; }
-if (typeof window !== 'undefined') { window.DisableBuddies = DisableBuddies; }
-if (typeof globalThis !== 'undefined') { globalThis.EnableTransfer = EnableTransfer; }
-if (typeof window !== 'undefined') { window.EnableTransfer = EnableTransfer; }
-if (typeof globalThis !== 'undefined') { globalThis.EnableConference = EnableConference; }
-if (typeof window !== 'undefined') { window.EnableConference = EnableConference; }
-if (typeof globalThis !== 'undefined') { globalThis.AutoAnswerPolicy = AutoAnswerPolicy; }
-if (typeof window !== 'undefined') { window.AutoAnswerPolicy = AutoAnswerPolicy; }
-if (typeof globalThis !== 'undefined') { globalThis.DoNotDisturbPolicy = DoNotDisturbPolicy; }
-if (typeof window !== 'undefined') { window.DoNotDisturbPolicy = DoNotDisturbPolicy; }
-if (typeof globalThis !== 'undefined') { globalThis.CallWaitingPolicy = CallWaitingPolicy; }
-if (typeof window !== 'undefined') { window.CallWaitingPolicy = CallWaitingPolicy; }
-if (typeof globalThis !== 'undefined') { globalThis.CallRecordingPolicy = CallRecordingPolicy; }
-if (typeof window !== 'undefined') { window.CallRecordingPolicy = CallRecordingPolicy; }
-if (typeof globalThis !== 'undefined') { globalThis.IntercomPolicy = IntercomPolicy; }
-if (typeof window !== 'undefined') { window.IntercomPolicy = IntercomPolicy; }
-if (typeof globalThis !== 'undefined') { globalThis.EnableAccountSettings = EnableAccountSettings; }
-if (typeof window !== 'undefined') { window.EnableAccountSettings = EnableAccountSettings; }
-if (typeof globalThis !== 'undefined') { globalThis.EnableAppearanceSettings = EnableAppearanceSettings; }
-if (typeof window !== 'undefined') { window.EnableAppearanceSettings = EnableAppearanceSettings; }
-if (typeof globalThis !== 'undefined') { globalThis.EnableNotificationSettings = EnableNotificationSettings; }
-if (typeof window !== 'undefined') { window.EnableNotificationSettings = EnableNotificationSettings; }
-if (typeof globalThis !== 'undefined') { globalThis.EnableAlphanumericDial = EnableAlphanumericDial; }
-if (typeof window !== 'undefined') { window.EnableAlphanumericDial = EnableAlphanumericDial; }
-if (typeof globalThis !== 'undefined') { globalThis.EnableVideoCalling = EnableVideoCalling; }
-if (typeof window !== 'undefined') { window.EnableVideoCalling = EnableVideoCalling; }
-if (typeof globalThis !== 'undefined') { globalThis.EnableTextExpressions = EnableTextExpressions; }
-if (typeof window !== 'undefined') { window.EnableTextExpressions = EnableTextExpressions; }
-if (typeof globalThis !== 'undefined') { globalThis.EnableTextDictate = EnableTextDictate; }
-if (typeof window !== 'undefined') { window.EnableTextDictate = EnableTextDictate; }
-if (typeof globalThis !== 'undefined') { globalThis.EnableRingtone = EnableRingtone; }
-if (typeof window !== 'undefined') { window.EnableRingtone = EnableRingtone; }
-if (typeof globalThis !== 'undefined') { globalThis.MaxBuddies = MaxBuddies; }
-if (typeof window !== 'undefined') { window.MaxBuddies = MaxBuddies; }
-if (typeof globalThis !== 'undefined') { globalThis.MaxBuddyAge = MaxBuddyAge; }
-if (typeof window !== 'undefined') { window.MaxBuddyAge = MaxBuddyAge; }
-if (typeof globalThis !== 'undefined') { globalThis.AutoDeleteDefault = AutoDeleteDefault; }
-if (typeof window !== 'undefined') { window.AutoDeleteDefault = AutoDeleteDefault; }
-if (typeof globalThis !== 'undefined') { globalThis.EnableSendFiles = EnableSendFiles; }
-if (typeof window !== 'undefined') { window.EnableSendFiles = EnableSendFiles; }
-if (typeof globalThis !== 'undefined') { globalThis.EnableSendImages = EnableSendImages; }
-if (typeof window !== 'undefined') { window.EnableSendImages = EnableSendImages; }
-if (typeof globalThis !== 'undefined') { globalThis.EnableAudioRecording = EnableAudioRecording; }
-if (typeof window !== 'undefined') { window.EnableAudioRecording = EnableAudioRecording; }
-if (typeof globalThis !== 'undefined') { globalThis.EnableVideoRecording = EnableVideoRecording; }
-if (typeof window !== 'undefined') { window.EnableVideoRecording = EnableVideoRecording; }
-if (typeof globalThis !== 'undefined') { globalThis.EnableSms = EnableSms; }
-if (typeof window !== 'undefined') { window.EnableSms = EnableSms; }
-if (typeof globalThis !== 'undefined') { globalThis.EnableFax = EnableFax; }
-if (typeof window !== 'undefined') { window.EnableFax = EnableFax; }
-if (typeof globalThis !== 'undefined') { globalThis.EnableEmail = EnableEmail; }
-if (typeof window !== 'undefined') { window.EnableEmail = EnableEmail; }
-if (typeof globalThis !== 'undefined') { globalThis.userAgent = userAgent; }
-if (typeof window !== 'undefined') { window.userAgent = userAgent; }
-if (typeof globalThis !== 'undefined') { globalThis.CanvasCollection = CanvasCollection; }
-if (typeof window !== 'undefined') { window.CanvasCollection = CanvasCollection; }
-if (typeof globalThis !== 'undefined') { globalThis.Buddies = Buddies; }
-if (typeof window !== 'undefined') { window.Buddies = Buddies; }
-if (typeof globalThis !== 'undefined') { globalThis.selectedBuddy = selectedBuddy; }
-if (typeof window !== 'undefined') { window.selectedBuddy = selectedBuddy; }
-if (typeof globalThis !== 'undefined') { globalThis.selectedLine = selectedLine; }
-if (typeof window !== 'undefined') { window.selectedLine = selectedLine; }
-if (typeof globalThis !== 'undefined') { globalThis.windowObj = windowObj; }
-if (typeof window !== 'undefined') { window.windowObj = windowObj; }
-if (typeof globalThis !== 'undefined') { globalThis.skipNextWindowAutoCenter = skipNextWindowAutoCenter; }
-if (typeof window !== 'undefined') { window.skipNextWindowAutoCenter = skipNextWindowAutoCenter; }
-if (typeof globalThis !== 'undefined') { globalThis.dtmfInlinePanelState = dtmfInlinePanelState; }
-if (typeof window !== 'undefined') { window.dtmfInlinePanelState = dtmfInlinePanelState; }
-if (typeof globalThis !== 'undefined') { globalThis.alertObj = alertObj; }
-if (typeof window !== 'undefined') { window.alertObj = alertObj; }
-if (typeof globalThis !== 'undefined') { globalThis.confirmObj = confirmObj; }
-if (typeof window !== 'undefined') { window.confirmObj = confirmObj; }
-if (typeof globalThis !== 'undefined') { globalThis.promptObj = promptObj; }
-if (typeof window !== 'undefined') { window.promptObj = promptObj; }
-if (typeof globalThis !== 'undefined') { globalThis.menuObj = menuObj; }
-if (typeof window !== 'undefined') { window.menuObj = menuObj; }
-if (typeof globalThis !== 'undefined') { globalThis.popupAnchorEl = popupAnchorEl; }
-if (typeof window !== 'undefined') { window.popupAnchorEl = popupAnchorEl; }
-if (typeof globalThis !== 'undefined') { globalThis.HasVideoDevice = HasVideoDevice; }
-if (typeof window !== 'undefined') { window.HasVideoDevice = HasVideoDevice; }
-if (typeof globalThis !== 'undefined') { globalThis.HasAudioDevice = HasAudioDevice; }
-if (typeof window !== 'undefined') { window.HasAudioDevice = HasAudioDevice; }
-if (typeof globalThis !== 'undefined') { globalThis.HasSpeakerDevice = HasSpeakerDevice; }
-if (typeof window !== 'undefined') { window.HasSpeakerDevice = HasSpeakerDevice; }
-if (typeof globalThis !== 'undefined') { globalThis.AudioinputDevices = AudioinputDevices; }
-if (typeof window !== 'undefined') { window.AudioinputDevices = AudioinputDevices; }
-if (typeof globalThis !== 'undefined') { globalThis.VideoinputDevices = VideoinputDevices; }
-if (typeof window !== 'undefined') { window.VideoinputDevices = VideoinputDevices; }
-if (typeof globalThis !== 'undefined') { globalThis.SpeakerDevices = SpeakerDevices; }
-if (typeof window !== 'undefined') { window.SpeakerDevices = SpeakerDevices; }
-if (typeof globalThis !== 'undefined') { globalThis.Lines = Lines; }
-if (typeof window !== 'undefined') { window.Lines = Lines; }
-if (typeof globalThis !== 'undefined') { globalThis.lang = lang; }
-if (typeof window !== 'undefined') { window.lang = lang; }
-if (typeof globalThis !== 'undefined') { globalThis.audioBlobs = audioBlobs; }
-if (typeof window !== 'undefined') { window.audioBlobs = audioBlobs; }
-if (typeof globalThis !== 'undefined') { globalThis.embeddedMediaMap = embeddedMediaMap; }
-if (typeof window !== 'undefined') { window.embeddedMediaMap = embeddedMediaMap; }
-if (typeof globalThis !== 'undefined') { globalThis.runtimeMediaConfig = runtimeMediaConfig; }
-if (typeof window !== 'undefined') { window.runtimeMediaConfig = runtimeMediaConfig; }
-if (typeof globalThis !== 'undefined') { globalThis.defaultMediaConfig = defaultMediaConfig; }
-if (typeof window !== 'undefined') { window.defaultMediaConfig = defaultMediaConfig; }
-if (typeof globalThis !== 'undefined') { globalThis.mediaConfigStorageKeys = mediaConfigStorageKeys; }
-if (typeof window !== 'undefined') { window.mediaConfigStorageKeys = mediaConfigStorageKeys; }
-if (typeof globalThis !== 'undefined') { globalThis.mediaUploadLimits = mediaUploadLimits; }
-if (typeof window !== 'undefined') { window.mediaUploadLimits = mediaUploadLimits; }
-if (typeof globalThis !== 'undefined') { globalThis.audioAutoplayUnlocked = audioAutoplayUnlocked; }
-if (typeof window !== 'undefined') { window.audioAutoplayUnlocked = audioAutoplayUnlocked; }
-if (typeof globalThis !== 'undefined') { globalThis.audioUnlockAttached = audioUnlockAttached; }
-if (typeof window !== 'undefined') { window.audioUnlockAttached = audioUnlockAttached; }
-if (typeof globalThis !== 'undefined') { globalThis.queuedAudioPlaybacks = queuedAudioPlaybacks; }
-if (typeof window !== 'undefined') { window.queuedAudioPlaybacks = queuedAudioPlaybacks; }
-
-
-// File: 02_utils.js
+function normalizeBooleanFlag(value, defaultValue){
+    if(value === undefined || value === null || value === "") return !!defaultValue;
+    if(typeof value === "boolean") return value;
+    if(typeof value === "number") return value !== 0;
+    var normalized = String(value).toLowerCase().trim();
+    if(normalized === "false" || normalized === "0" || normalized === "no" || normalized === "off") return false;
+    if(normalized === "true" || normalized === "1" || normalized === "yes" || normalized === "on") return true;
+    return !!defaultValue;
+}
 let newLineNumber = 1;
 let telNumericRegEx = /[^\d\*\#\+]/g
 let telAlphanumericRegEx = /[^\da-zA-Z\*\#\+\-\_\.\!\~\'\(\)]/g
@@ -612,6 +205,10 @@ function uID(){
 }
 function utcDateNow(){
     return moment().utc().format("YYYY-MM-DD HH:mm:ss UTC");
+}
+function getDbItem(itemIndex, defaultValue){
+    if(localDB.getItem(itemIndex) != null) return localDB.getItem(itemIndex);
+    return defaultValue;
 }
 function IsAutoplayBlockedError(err){
     if(!err) return false;
@@ -671,6 +268,44 @@ function PlayMediaElementSafely(mediaElement, label){
             console.warn("Unable to play media element:", label || "media", err);
         });
     }
+}
+window.addEventListener("unhandledrejection", function(event){
+    try {
+        var reason = String((event && event.reason) ? event.reason : "");
+        if(reason.indexOf('FN_NOT_FOUND: "siteFrame.closeSiteFrame"') > -1 ||
+           reason.indexOf('FN_NOT_FOUND: "cardFrame.closeCardFrame"') > -1 ||
+           reason.indexOf('FN_NOT_FOUND: "passkey.closePasskeyConditionalList"') > -1 ||
+           reason.indexOf("isAutoSaveDisabled") > -1){
+            event.preventDefault();
+        }
+    } catch(e){}
+});
+function IsMd5Hex32(value){
+    return /^[a-f0-9]{32}$/i.test(String(value || "").trim());
+}
+function NormalizeSipPasswordAndType(rawPassword, rawType){
+    var password = String(rawPassword || "").trim();
+    var type = String(rawType || "").toLowerCase().trim();
+    var prefixedMd5Match = password.match(/^(?:md5|ha1)\s*[:=]\s*([a-f0-9]{32})$/i);
+    if(prefixedMd5Match){
+        password = prefixedMd5Match[1];
+    }
+
+    var isMd5Hex = IsMd5Hex32(password);
+
+    if(type === "ha1" && isMd5Hex){
+        return { password: password.toLowerCase(), type: "ha1" };
+    }
+    if(type === "plain"){
+        return { password: password, type: "plain" };
+    }
+    if(type === "ha1" && !isMd5Hex){
+        return { password: password, type: "plain" };
+    }
+    if(isMd5Hex){
+        return { password: password.toLowerCase(), type: "ha1" };
+    }
+    return { password: password, type: "plain" };
 }
 function TryAuthModeFallbackOnRegisterFailure(statusCode){
     if(authModeFallbackTried) return false;
@@ -1179,141 +814,6 @@ function GetRecentCallStatus(cdr){
         statusText: (lang && lang.you_missed_a_call) ? lang.you_missed_a_call : "You missed a call"
     };
 }
-
-// Global exports shim for backwards compatibility
-if (typeof globalThis !== 'undefined') { globalThis.newLineNumber = newLineNumber; }
-if (typeof window !== 'undefined') { window.newLineNumber = newLineNumber; }
-if (typeof globalThis !== 'undefined') { globalThis.telNumericRegEx = telNumericRegEx; }
-if (typeof window !== 'undefined') { window.telNumericRegEx = telNumericRegEx; }
-if (typeof globalThis !== 'undefined') { globalThis.telAlphanumericRegEx = telAlphanumericRegEx; }
-if (typeof window !== 'undefined') { window.telAlphanumericRegEx = telAlphanumericRegEx; }
-if (typeof globalThis !== 'undefined') { globalThis.settingsMicrophoneStream = settingsMicrophoneStream; }
-if (typeof window !== 'undefined') { window.settingsMicrophoneStream = settingsMicrophoneStream; }
-if (typeof globalThis !== 'undefined') { globalThis.settingsMicrophoneStreamTrack = settingsMicrophoneStreamTrack; }
-if (typeof window !== 'undefined') { window.settingsMicrophoneStreamTrack = settingsMicrophoneStreamTrack; }
-if (typeof globalThis !== 'undefined') { globalThis.settingsMicrophoneSoundMeter = settingsMicrophoneSoundMeter; }
-if (typeof window !== 'undefined') { window.settingsMicrophoneSoundMeter = settingsMicrophoneSoundMeter; }
-if (typeof globalThis !== 'undefined') { globalThis.settingsVideoStream = settingsVideoStream; }
-if (typeof window !== 'undefined') { window.settingsVideoStream = settingsVideoStream; }
-if (typeof globalThis !== 'undefined') { globalThis.settingsVideoStreamTrack = settingsVideoStreamTrack; }
-if (typeof window !== 'undefined') { window.settingsVideoStreamTrack = settingsVideoStreamTrack; }
-if (typeof globalThis !== 'undefined') { globalThis.authModeFallbackTried = authModeFallbackTried; }
-if (typeof window !== 'undefined') { window.authModeFallbackTried = authModeFallbackTried; }
-if (typeof globalThis !== 'undefined') { globalThis.CallRecordingsIndexDb = CallRecordingsIndexDb; }
-if (typeof window !== 'undefined') { window.CallRecordingsIndexDb = CallRecordingsIndexDb; }
-if (typeof globalThis !== 'undefined') { globalThis.CallQosDataIndexDb = CallQosDataIndexDb; }
-if (typeof window !== 'undefined') { window.CallQosDataIndexDb = CallQosDataIndexDb; }
-if (typeof globalThis !== 'undefined') { globalThis.uID = uID; }
-if (typeof window !== 'undefined') { window.uID = uID; }
-if (typeof globalThis !== 'undefined') { globalThis.utcDateNow = utcDateNow; }
-if (typeof window !== 'undefined') { window.utcDateNow = utcDateNow; }
-if (typeof globalThis !== 'undefined') { globalThis.IsAutoplayBlockedError = IsAutoplayBlockedError; }
-if (typeof window !== 'undefined') { window.IsAutoplayBlockedError = IsAutoplayBlockedError; }
-if (typeof globalThis !== 'undefined') { globalThis.FlushQueuedAudioPlayback = FlushQueuedAudioPlayback; }
-if (typeof window !== 'undefined') { window.FlushQueuedAudioPlayback = FlushQueuedAudioPlayback; }
-if (typeof globalThis !== 'undefined') { globalThis.MarkAudioInteractionAndUnlock = MarkAudioInteractionAndUnlock; }
-if (typeof window !== 'undefined') { window.MarkAudioInteractionAndUnlock = MarkAudioInteractionAndUnlock; }
-if (typeof globalThis !== 'undefined') { globalThis.EnsureAudioUnlockListeners = EnsureAudioUnlockListeners; }
-if (typeof window !== 'undefined') { window.EnsureAudioUnlockListeners = EnsureAudioUnlockListeners; }
-if (typeof globalThis !== 'undefined') { globalThis.PlayMediaElementSafely = PlayMediaElementSafely; }
-if (typeof window !== 'undefined') { window.PlayMediaElementSafely = PlayMediaElementSafely; }
-if (typeof globalThis !== 'undefined') { globalThis.TryAuthModeFallbackOnRegisterFailure = TryAuthModeFallbackOnRegisterFailure; }
-if (typeof window !== 'undefined') { window.TryAuthModeFallbackOnRegisterFailure = TryAuthModeFallbackOnRegisterFailure; }
-if (typeof globalThis !== 'undefined') { globalThis.EnsureBuddyStorageKeys = EnsureBuddyStorageKeys; }
-if (typeof window !== 'undefined') { window.EnsureBuddyStorageKeys = EnsureBuddyStorageKeys; }
-if (typeof globalThis !== 'undefined') { globalThis.RemoveSeedSampleStorageData = RemoveSeedSampleStorageData; }
-if (typeof window !== 'undefined') { window.RemoveSeedSampleStorageData = RemoveSeedSampleStorageData; }
-if (typeof globalThis !== 'undefined') { globalThis.getAudioSrcID = getAudioSrcID; }
-if (typeof window !== 'undefined') { window.getAudioSrcID = getAudioSrcID; }
-if (typeof globalThis !== 'undefined') { globalThis.getAudioOutputID = getAudioOutputID; }
-if (typeof window !== 'undefined') { window.getAudioOutputID = getAudioOutputID; }
-if (typeof globalThis !== 'undefined') { globalThis.getVideoSrcID = getVideoSrcID; }
-if (typeof window !== 'undefined') { window.getVideoSrcID = getVideoSrcID; }
-if (typeof globalThis !== 'undefined') { globalThis.getRingerOutputID = getRingerOutputID; }
-if (typeof window !== 'undefined') { window.getRingerOutputID = getRingerOutputID; }
-if (typeof globalThis !== 'undefined') { globalThis.isAbsoluteIconPath = isAbsoluteIconPath; }
-if (typeof window !== 'undefined') { window.isAbsoluteIconPath = isAbsoluteIconPath; }
-if (typeof globalThis !== 'undefined') { globalThis.resolveIconUrl = resolveIconUrl; }
-if (typeof window !== 'undefined') { window.resolveIconUrl = resolveIconUrl; }
-if (typeof globalThis !== 'undefined') { globalThis.getAppIconUrl = getAppIconUrl; }
-if (typeof window !== 'undefined') { window.getAppIconUrl = getAppIconUrl; }
-if (typeof globalThis !== 'undefined') { globalThis.getNotificationIconUrl = getNotificationIconUrl; }
-if (typeof window !== 'undefined') { window.getNotificationIconUrl = getNotificationIconUrl; }
-if (typeof globalThis !== 'undefined') { globalThis.getDefaultProfileIconUrl = getDefaultProfileIconUrl; }
-if (typeof window !== 'undefined') { window.getDefaultProfileIconUrl = getDefaultProfileIconUrl; }
-if (typeof globalThis !== 'undefined') { globalThis.applyRuntimeDocumentIcons = applyRuntimeDocumentIcons; }
-if (typeof window !== 'undefined') { window.applyRuntimeDocumentIcons = applyRuntimeDocumentIcons; }
-if (typeof globalThis !== 'undefined') { globalThis.PadClockPart = PadClockPart; }
-if (typeof window !== 'undefined') { window.PadClockPart = PadClockPart; }
-if (typeof globalThis !== 'undefined') { globalThis.FormatDurationClock = FormatDurationClock; }
-if (typeof window !== 'undefined') { window.FormatDurationClock = FormatDurationClock; }
-if (typeof globalThis !== 'undefined') { globalThis.formatShortDuration = formatShortDuration; }
-if (typeof window !== 'undefined') { window.formatShortDuration = formatShortDuration; }
-if (typeof globalThis !== 'undefined') { globalThis.UserLocale = UserLocale; }
-if (typeof window !== 'undefined') { window.UserLocale = UserLocale; }
-if (typeof globalThis !== 'undefined') { globalThis.GetAlternateLanguage = GetAlternateLanguage; }
-if (typeof window !== 'undefined') { window.GetAlternateLanguage = GetAlternateLanguage; }
-if (typeof globalThis !== 'undefined') { globalThis.ResolveLanguageFromPacks = ResolveLanguageFromPacks; }
-if (typeof window !== 'undefined') { window.ResolveLanguageFromPacks = ResolveLanguageFromPacks; }
-if (typeof globalThis !== 'undefined') { globalThis.base64toBlob = base64toBlob; }
-if (typeof window !== 'undefined') { window.base64toBlob = base64toBlob; }
-if (typeof globalThis !== 'undefined') { globalThis.MakeDataArray = MakeDataArray; }
-if (typeof window !== 'undefined') { window.MakeDataArray = MakeDataArray; }
-if (typeof globalThis !== 'undefined') { globalThis.GetUiText = GetUiText; }
-if (typeof window !== 'undefined') { window.GetUiText = GetUiText; }
-if (typeof globalThis !== 'undefined') { globalThis.ApplyMobileLabels = ApplyMobileLabels; }
-if (typeof window !== 'undefined') { window.ApplyMobileLabels = ApplyMobileLabels; }
-if (typeof globalThis !== 'undefined') { globalThis.SanitizePhoneSearch = SanitizePhoneSearch; }
-if (typeof window !== 'undefined') { window.SanitizePhoneSearch = SanitizePhoneSearch; }
-if (typeof globalThis !== 'undefined') { globalThis.EscapeHtml = EscapeHtml; }
-if (typeof window !== 'undefined') { window.EscapeHtml = EscapeHtml; }
-if (typeof globalThis !== 'undefined') { globalThis.EscapeAttr = EscapeAttr; }
-if (typeof window !== 'undefined') { window.EscapeAttr = EscapeAttr; }
-if (typeof globalThis !== 'undefined') { globalThis.GetActiveMainTab = GetActiveMainTab; }
-if (typeof window !== 'undefined') { window.GetActiveMainTab = GetActiveMainTab; }
-if (typeof globalThis !== 'undefined') { globalThis.GetTabSearchStorageKey = GetTabSearchStorageKey; }
-if (typeof window !== 'undefined') { window.GetTabSearchStorageKey = GetTabSearchStorageKey; }
-if (typeof globalThis !== 'undefined') { globalThis.GetStoredTabSearch = GetStoredTabSearch; }
-if (typeof window !== 'undefined') { window.GetStoredTabSearch = GetStoredTabSearch; }
-if (typeof globalThis !== 'undefined') { globalThis.SetStoredTabSearch = SetStoredTabSearch; }
-if (typeof window !== 'undefined') { window.SetStoredTabSearch = SetStoredTabSearch; }
-if (typeof globalThis !== 'undefined') { globalThis.HasInjectedSipConfig = HasInjectedSipConfig; }
-if (typeof window !== 'undefined') { window.HasInjectedSipConfig = HasInjectedSipConfig; }
-if (typeof globalThis !== 'undefined') { globalThis.IsCallFirstContactMode = IsCallFirstContactMode; }
-if (typeof window !== 'undefined') { window.IsCallFirstContactMode = IsCallFirstContactMode; }
-if (typeof globalThis !== 'undefined') { globalThis.ResolveRecentCallbackNumber = ResolveRecentCallbackNumber; }
-if (typeof window !== 'undefined') { window.ResolveRecentCallbackNumber = ResolveRecentCallbackNumber; }
-if (typeof globalThis !== 'undefined') { globalThis.NormalizeCallerDisplayText = NormalizeCallerDisplayText; }
-if (typeof window !== 'undefined') { window.NormalizeCallerDisplayText = NormalizeCallerDisplayText; }
-if (typeof globalThis !== 'undefined') { globalThis.BuildCallerDisplay = BuildCallerDisplay; }
-if (typeof window !== 'undefined') { window.BuildCallerDisplay = BuildCallerDisplay; }
-if (typeof globalThis !== 'undefined') { globalThis.GetRecentDisplayInfo = GetRecentDisplayInfo; }
-if (typeof window !== 'undefined') { window.GetRecentDisplayInfo = GetRecentDisplayInfo; }
-if (typeof globalThis !== 'undefined') { globalThis.GetRecentDisplayLabel = GetRecentDisplayLabel; }
-if (typeof window !== 'undefined') { window.GetRecentDisplayLabel = GetRecentDisplayLabel; }
-if (typeof globalThis !== 'undefined') { globalThis.GetRecentDirection = GetRecentDirection; }
-if (typeof window !== 'undefined') { window.GetRecentDirection = GetRecentDirection; }
-if (typeof globalThis !== 'undefined') { globalThis.GetRecentDayKey = GetRecentDayKey; }
-if (typeof window !== 'undefined') { window.GetRecentDayKey = GetRecentDayKey; }
-if (typeof globalThis !== 'undefined') { globalThis.GetRecentDirectionIcon = GetRecentDirectionIcon; }
-if (typeof window !== 'undefined') { window.GetRecentDirectionIcon = GetRecentDirectionIcon; }
-if (typeof globalThis !== 'undefined') { globalThis.FormatRecentLogTime = FormatRecentLogTime; }
-if (typeof window !== 'undefined') { window.FormatRecentLogTime = FormatRecentLogTime; }
-if (typeof globalThis !== 'undefined') { globalThis.GetRecentDayLabel = GetRecentDayLabel; }
-if (typeof window !== 'undefined') { window.GetRecentDayLabel = GetRecentDayLabel; }
-if (typeof globalThis !== 'undefined') { globalThis.ParseUtcDisplayDate = ParseUtcDisplayDate; }
-if (typeof window !== 'undefined') { window.ParseUtcDisplayDate = ParseUtcDisplayDate; }
-if (typeof globalThis !== 'undefined') { globalThis.FormatFixedClockTime = FormatFixedClockTime; }
-if (typeof window !== 'undefined') { window.FormatFixedClockTime = FormatFixedClockTime; }
-if (typeof globalThis !== 'undefined') { globalThis.FormatFixedDate = FormatFixedDate; }
-if (typeof window !== 'undefined') { window.FormatFixedDate = FormatFixedDate; }
-if (typeof globalThis !== 'undefined') { globalThis.SearchRecentsByNumber = SearchRecentsByNumber; }
-if (typeof window !== 'undefined') { window.SearchRecentsByNumber = SearchRecentsByNumber; }
-if (typeof globalThis !== 'undefined') { globalThis.GetRecentCallStatus = GetRecentCallStatus; }
-if (typeof window !== 'undefined') { window.GetRecentCallStatus = GetRecentCallStatus; }
-
-
-// File: 03_line_reg.js
 function GetBuddyDialNumber(buddyObj){
     if(!buddyObj) return "";
     if(buddyObj.ExtNo && buddyObj.ExtNo != "") return buddyObj.ExtNo;
@@ -1473,34 +973,61 @@ $(window).on("online", function(){
     TransportManualDisconnect = false;
     ReconnectTransport();
 });
+window.addEventListener("message", function(event) {
+    if(!event.data) return;
+    if(event.data.action === "desktop-shortcut"){
+        HandleShortcutAction(event.data.data ? event.data.data.shortcutAction : null);
+        return;
+    }
+    if(event.data.action !== "makeCall" && event.data.action !== "clickToCall") return;
 
+    var data = event.data.data || {};
+    var numberToDial = data.numberToDial;
+    var callType = data.callType || 'audio';
+    var callerName = data.callerName || null;
+    var extraHeaders = data.extraHeaders || null;
 
-// Global exports shim for backwards compatibility
-if (typeof globalThis !== 'undefined') { globalThis.GetBuddyDialNumber = GetBuddyDialNumber; }
-if (typeof window !== 'undefined') { window.GetBuddyDialNumber = GetBuddyDialNumber; }
-if (typeof globalThis !== 'undefined') { globalThis.BuildCallDisplayInfo = BuildCallDisplayInfo; }
-if (typeof window !== 'undefined') { window.BuildCallDisplayInfo = BuildCallDisplayInfo; }
-if (typeof globalThis !== 'undefined') { globalThis.RefreshLineDisplay = RefreshLineDisplay; }
-if (typeof window !== 'undefined') { window.RefreshLineDisplay = RefreshLineDisplay; }
-if (typeof globalThis !== 'undefined') { globalThis.AttachSessionTerminationObserver = AttachSessionTerminationObserver; }
-if (typeof window !== 'undefined') { window.AttachSessionTerminationObserver = AttachSessionTerminationObserver; }
-if (typeof globalThis !== 'undefined') { globalThis.UpdateDialpadSettingButtons = UpdateDialpadSettingButtons; }
-if (typeof window !== 'undefined') { window.UpdateDialpadSettingButtons = UpdateDialpadSettingButtons; }
-if (typeof globalThis !== 'undefined') { globalThis.ApplyDoNotDisturbState = ApplyDoNotDisturbState; }
-if (typeof window !== 'undefined') { window.ApplyDoNotDisturbState = ApplyDoNotDisturbState; }
-if (typeof globalThis !== 'undefined') { globalThis.ToggleDialpadSetting = ToggleDialpadSetting; }
-if (typeof window !== 'undefined') { window.ToggleDialpadSetting = ToggleDialpadSetting; }
-if (typeof globalThis !== 'undefined') { globalThis.SyncMobileRegLink = SyncMobileRegLink; }
-if (typeof window !== 'undefined') { window.SyncMobileRegLink = SyncMobileRegLink; }
-if (typeof globalThis !== 'undefined') { globalThis.GetMobileRegistrationText = GetMobileRegistrationText; }
-if (typeof window !== 'undefined') { window.GetMobileRegistrationText = GetMobileRegistrationText; }
-if (typeof globalThis !== 'undefined') { globalThis.BuildMobileEmptyState = BuildMobileEmptyState; }
-if (typeof window !== 'undefined') { window.BuildMobileEmptyState = BuildMobileEmptyState; }
-if (typeof globalThis !== 'undefined') { globalThis.SetMobilePaneEmptyState = SetMobilePaneEmptyState; }
-if (typeof window !== 'undefined') { window.SetMobilePaneEmptyState = SetMobilePaneEmptyState; }
+    if(!numberToDial || numberToDial.trim() === '') {
+        console.warn("makeCall: No number to dial");
+        return;
+    }
 
+    console.log("makeCall initiated for:", numberToDial, "Type:", callType);
 
-// File: 04_keyboard.js
+    try {
+        DialByLine(callType, null, numberToDial, callerName, extraHeaders);
+    } catch(e) {
+        console.error("makeCall failed:", e);
+    }
+});
+
+function NormalizeKeyboardShortcuts(value){
+    var defaults = {
+        answer: "F2",
+        hangup: "Escape",
+        hold: "F4",
+        mute: "F6",
+        transfer: "F8",
+        dialpad: "F9"
+    };
+    var configured = {};
+    if(value && typeof value === "string"){
+        try {
+            configured = JSON.parse(value);
+        } catch(e){
+            configured = {};
+        }
+    }
+    else if(value && typeof value === "object"){
+        configured = value;
+    }
+    for(var key in defaults){
+        if(!Object.prototype.hasOwnProperty.call(defaults, key)) continue;
+        if(!configured[key]) configured[key] = defaults[key];
+        configured[key] = String(configured[key]).trim();
+    }
+    return configured;
+}
 function GetKeyboardShortcutAction(event){
     if(!event || event.ctrlKey || event.altKey || event.metaKey) return null;
     var pressed = String(event.key || "").trim();
@@ -1572,167 +1099,165 @@ function HandleShortcutAction(shortcutAction){
 }
 $(window).on("keydown", HandleKeyboardShortcut);
 $(document).ready(function () {
-    setTimeout(function() {
-        PrepareIndexDB();
+    PrepareIndexDB();
 
-        var options = (typeof phoneOptions !== 'undefined')? phoneOptions : {};
-        if(options.welcomeScreen !== undefined) welcomeScreen = options.welcomeScreen;
-        if(options.loadAlternateLang !== undefined) loadAlternateLang = options.loadAlternateLang;
-        if(options.profileName !== undefined) profileName = options.profileName;
-        if(options.imagesDirectory !== undefined) imagesDirectory = options.imagesDirectory;
-        if(options.wallpaperLight !== undefined) wallpaperLight = options.wallpaperLight;
-        if(options.wallpaperDark !== undefined) wallpaperDark = options.wallpaperDark;
-        if(options.wssServer !== undefined) wssServer = options.wssServer;
-        if(options.WebSocketPort !== undefined) WebSocketPort = options.WebSocketPort;
-        if(options.ServerPath !== undefined) ServerPath = options.ServerPath;
-        if(options.Wss !== undefined) Wss = normalizeBooleanFlag(options.Wss, true);
-        if(options.wss !== undefined) Wss = normalizeBooleanFlag(options.wss, true);
-        if(options.SipDomain !== undefined) SipDomain = options.SipDomain;
-        if(options.SipUsername !== undefined) SipUsername = options.SipUsername;
-        if(options.SipPassword !== undefined) SipPassword = options.SipPassword;
-        if(options.SipPasswordType !== undefined) SipPasswordType = options.SipPasswordType;
-        if(options.SingleInstance !== undefined) SingleInstance = options.SingleInstance;
-        if(options.TransportConnectionTimeout !== undefined) TransportConnectionTimeout = options.TransportConnectionTimeout;
-        if(options.TransportReconnectionAttempts !== undefined) TransportReconnectionAttempts = options.TransportReconnectionAttempts;
-        if(options.TransportReconnectionTimeout !== undefined) TransportReconnectionTimeout = options.TransportReconnectionTimeout;
-        if(options.SubscribeToYourself !== undefined) SubscribeToYourself = options.SubscribeToYourself;
-        if(options.VoiceMailSubscribe !== undefined) VoiceMailSubscribe = options.VoiceMailSubscribe;
-        if(options.VoicemailDid !== undefined) VoicemailDid = options.VoicemailDid;
-        if(options.SubscribeVoicemailExpires !== undefined) SubscribeVoicemailExpires = options.SubscribeVoicemailExpires;
-        if(options.ContactUserName !== undefined) ContactUserName = options.ContactUserName;
-        if(options.userAgentStr !== undefined) userAgentStr = options.userAgentStr;
-        if(options.hostingPrefix !== undefined) hostingPrefix = options.hostingPrefix;
-        if(options.AppIcon !== undefined) AppIcon = options.AppIcon;
-        if(options.appIcon !== undefined) AppIcon = options.appIcon;
-        if(options.NotificationIcon !== undefined) NotificationIcon = options.NotificationIcon;
-        if(options.notificationIcon !== undefined) NotificationIcon = options.notificationIcon;
-        if(options.DefaultProfileIcon !== undefined) DefaultProfileIcon = options.DefaultProfileIcon;
-        if(options.defaultProfileIcon !== undefined) DefaultProfileIcon = options.defaultProfileIcon;
-        if(options.RegisterExpires !== undefined) RegisterExpires = options.RegisterExpires;
-        if(options.RegisterExtraHeaders !== undefined) RegisterExtraHeaders = options.RegisterExtraHeaders;
-        if(options.RegisterExtraContactParams !== undefined) RegisterExtraContactParams = options.RegisterExtraContactParams;
-        if(options.RegisterContactParams !== undefined) RegisterContactParams = options.RegisterContactParams;
-        if(options.WssInTransport !== undefined) WssInTransport = options.WssInTransport;
-        if(options.IpInContact !== undefined) IpInContact = options.IpInContact;
-        if(options.BundlePolicy !== undefined) BundlePolicy = options.BundlePolicy;
-        if(options.IceStunServerJson !== undefined) IceStunServerJson = options.IceStunServerJson;
-        if(options.IceStunCheckTimeout !== undefined) IceStunCheckTimeout = options.IceStunCheckTimeout;
-        if(options.SubscribeBuddyAccept !== undefined) SubscribeBuddyAccept = options.SubscribeBuddyAccept;
-        if(options.SubscribeBuddyEvent !== undefined) SubscribeBuddyEvent = options.SubscribeBuddyEvent;
-        if(options.SubscribeBuddyExpires !== undefined) SubscribeBuddyExpires = options.SubscribeBuddyExpires;
-        if(options.ProfileDisplayPrefix !== undefined) ProfileDisplayPrefix = options.ProfileDisplayPrefix;
-        if(options.ProfileDisplayPrefixSeparator !== undefined) ProfileDisplayPrefixSeparator = options.ProfileDisplayPrefixSeparator;
-        if(options.InviteExtraHeaders !== undefined) InviteExtraHeaders = options.InviteExtraHeaders;
-        if(options.NoAnswerTimeout !== undefined) NoAnswerTimeout = options.NoAnswerTimeout;
-        if(options.AutoAnswerEnabled !== undefined) AutoAnswerEnabled = options.AutoAnswerEnabled;
-        if(options.DoNotDisturbEnabled !== undefined) DoNotDisturbEnabled = options.DoNotDisturbEnabled;
-        if(options.CallWaitingEnabled !== undefined) CallWaitingEnabled = options.CallWaitingEnabled;
-        if(options.RecordAllCalls !== undefined) RecordAllCalls = options.RecordAllCalls;
-        if(options.StartVideoFullScreen !== undefined) StartVideoFullScreen = options.StartVideoFullScreen;
-        if(options.SelectRingingLine !== undefined) SelectRingingLine = options.SelectRingingLine;
-        if(options.UiMaxWidth !== undefined) UiMaxWidth = options.UiMaxWidth;
-        if(options.UiThemeStyle !== undefined) UiThemeStyle = options.UiThemeStyle;
-        if(options.UiMessageLayout !== undefined) UiMessageLayout = options.UiMessageLayout;
-        if(options.UiCustomConfigMenu !== undefined) UiCustomConfigMenu = options.UiCustomConfigMenu;
-        if(options.UiCustomDialButton !== undefined) UiCustomDialButton = options.UiCustomDialButton;
-        if(options.UiCustomSortAndFilterButton !== undefined) UiCustomSortAndFilterButton = options.UiCustomSortAndFilterButton;
-        if(options.UiCustomAddBuddy !== undefined) UiCustomAddBuddy = options.UiCustomAddBuddy;
-        if(options.UiCustomEditBuddy !== undefined) UiCustomEditBuddy = options.UiCustomEditBuddy;
-        if(options.UiCustomMediaSettings !== undefined) UiCustomMediaSettings = options.UiCustomMediaSettings;
-        if(options.UiCustomMessageAction !== undefined) UiCustomMessageAction = options.UiCustomMessageAction;
-        if(options.TraceSip !== undefined) TraceSip = (options.TraceSip == true || options.TraceSip == "1");
-        if(options.HideSettingsButton !== undefined) HideSettingsButton = !!options.HideSettingsButton;
-        if(options.HideRecordAllCallsButton !== undefined) HideRecordAllCallsButton = !!options.HideRecordAllCallsButton;
-        if(options.AutoGainControl !== undefined) AutoGainControl = options.AutoGainControl;
-        if(options.EchoCancellation !== undefined) EchoCancellation = options.EchoCancellation;
-        if(options.NoiseSuppression !== undefined) NoiseSuppression = options.NoiseSuppression;
-        if(options.MirrorVideo !== undefined) MirrorVideo = options.MirrorVideo;
-        if(options.maxFrameRate !== undefined) maxFrameRate = options.maxFrameRate;
-        if(options.videoHeight !== undefined) videoHeight = options.videoHeight;
-        if(options.MaxVideoBandwidth !== undefined) MaxVideoBandwidth = options.MaxVideoBandwidth;
-        if(options.videoAspectRatio !== undefined) videoAspectRatio = options.videoAspectRatio;
-        if(options.NotificationsActive !== undefined) NotificationsActive = options.NotificationsActive;
-        if(options.StreamBuffer !== undefined) StreamBuffer = options.StreamBuffer;
-        if(options.PosterJpegQuality !== undefined) PosterJpegQuality = options.PosterJpegQuality;
-        if(options.VideoResampleSize !== undefined) VideoResampleSize = options.VideoResampleSize;
-        if(options.RecordingVideoSize !== undefined) RecordingVideoSize = options.RecordingVideoSize;
-        if(options.RecordingVideoFps !== undefined) RecordingVideoFps = options.RecordingVideoFps;
-        if(options.RecordingLayout !== undefined) RecordingLayout = options.RecordingLayout;
-        if(options.DidLength !== undefined) DidLength = options.DidLength;
-        if(options.MaxDidLength !== undefined) MaxDidLength = options.MaxDidLength;
-        if(options.DisplayDateFormat !== undefined) DisplayDateFormat = options.DisplayDateFormat;
-        if(options.DisplayTimeFormat !== undefined) DisplayTimeFormat = options.DisplayTimeFormat;
-        if(options.Language !== undefined) Language = options.Language;
-        if(options.BuddySortBy !== undefined) BuddySortBy = options.BuddySortBy;
-        if(options.SortByTypeOrder !== undefined) SortByTypeOrder = options.SortByTypeOrder;
-        if(options.BuddyAutoDeleteAtEnd !== undefined) BuddyAutoDeleteAtEnd = options.BuddyAutoDeleteAtEnd;
-        if(options.HideAutoDeleteBuddies !== undefined) HideAutoDeleteBuddies = options.HideAutoDeleteBuddies;
-        if(options.BuddyShowExtenNum !== undefined) BuddyShowExtenNum = options.BuddyShowExtenNum;
-        if(options.DisableFreeDial !== undefined) DisableFreeDial = options.DisableFreeDial;
-        if(options.DisableBuddies !== undefined) DisableBuddies = options.DisableBuddies;
-        if(options.EnableTransfer !== undefined) EnableTransfer = options.EnableTransfer;
-        if(options.EnableConference !== undefined) EnableConference = options.EnableConference;
-        if(options.AutoAnswerPolicy !== undefined) AutoAnswerPolicy = options.AutoAnswerPolicy;
-        if(options.DoNotDisturbPolicy !== undefined) DoNotDisturbPolicy = options.DoNotDisturbPolicy;
-        if(options.CallWaitingPolicy !== undefined) CallWaitingPolicy = options.CallWaitingPolicy;
-        if(options.CallRecordingPolicy !== undefined) CallRecordingPolicy = options.CallRecordingPolicy;
-        if(options.IntercomPolicy !== undefined) IntercomPolicy = options.IntercomPolicy;
-        if(options.EnableAccountSettings !== undefined) EnableAccountSettings = options.EnableAccountSettings;
-        if(options.EnableAppearanceSettings !== undefined) EnableAppearanceSettings = options.EnableAppearanceSettings;
-        if(options.EnableNotificationSettings !== undefined) EnableNotificationSettings = options.EnableNotificationSettings;
-        if(options.EnableAlphanumericDial !== undefined) EnableAlphanumericDial = options.EnableAlphanumericDial;
-        if(options.EnableVideoCalling !== undefined) EnableVideoCalling = options.EnableVideoCalling;
-        if(options.EnableTextExpressions !== undefined) EnableTextExpressions = options.EnableTextExpressions;
-        if(options.EnableTextDictate !== undefined) EnableTextDictate = options.EnableTextDictate;
-        if(options.EnableRingtone !== undefined) EnableRingtone = options.EnableRingtone;
-        if(options.MaxBuddies !== undefined) MaxBuddies = options.MaxBuddies;
-        if(options.MaxBuddyAge !== undefined) MaxBuddyAge = options.MaxBuddyAge;
-        setRuntimeMediaConfigFromOptions(options);
+    var options = (typeof phoneOptions !== 'undefined')? phoneOptions : {};
+    if(options.welcomeScreen !== undefined) welcomeScreen = options.welcomeScreen;
+    if(options.loadAlternateLang !== undefined) loadAlternateLang = options.loadAlternateLang;
+    if(options.profileName !== undefined) profileName = options.profileName;
+    if(options.imagesDirectory !== undefined) imagesDirectory = options.imagesDirectory;
+    if(options.wallpaperLight !== undefined) wallpaperLight = options.wallpaperLight;
+    if(options.wallpaperDark !== undefined) wallpaperDark = options.wallpaperDark;
+    if(options.wssServer !== undefined) wssServer = options.wssServer;
+    if(options.WebSocketPort !== undefined) WebSocketPort = options.WebSocketPort;
+    if(options.ServerPath !== undefined) ServerPath = options.ServerPath;
+    if(options.Wss !== undefined) Wss = normalizeBooleanFlag(options.Wss, true);
+    if(options.wss !== undefined) Wss = normalizeBooleanFlag(options.wss, true);
+    if(options.SipDomain !== undefined) SipDomain = options.SipDomain;
+    if(options.SipUsername !== undefined) SipUsername = options.SipUsername;
+    if(options.SipPassword !== undefined) SipPassword = options.SipPassword;
+    if(options.SipPasswordType !== undefined) SipPasswordType = options.SipPasswordType;
+    if(options.SingleInstance !== undefined) SingleInstance = options.SingleInstance;
+    if(options.TransportConnectionTimeout !== undefined) TransportConnectionTimeout = options.TransportConnectionTimeout;
+    if(options.TransportReconnectionAttempts !== undefined) TransportReconnectionAttempts = options.TransportReconnectionAttempts;
+    if(options.TransportReconnectionTimeout !== undefined) TransportReconnectionTimeout = options.TransportReconnectionTimeout;
+    if(options.SubscribeToYourself !== undefined) SubscribeToYourself = options.SubscribeToYourself;
+    if(options.VoiceMailSubscribe !== undefined) VoiceMailSubscribe = options.VoiceMailSubscribe;
+    if(options.VoicemailDid !== undefined) VoicemailDid = options.VoicemailDid;
+    if(options.SubscribeVoicemailExpires !== undefined) SubscribeVoicemailExpires = options.SubscribeVoicemailExpires;
+    if(options.ContactUserName !== undefined) ContactUserName = options.ContactUserName;
+    if(options.userAgentStr !== undefined) userAgentStr = options.userAgentStr;
+    if(options.hostingPrefix !== undefined) hostingPrefix = options.hostingPrefix;
+    if(options.AppIcon !== undefined) AppIcon = options.AppIcon;
+    if(options.appIcon !== undefined) AppIcon = options.appIcon;
+    if(options.NotificationIcon !== undefined) NotificationIcon = options.NotificationIcon;
+    if(options.notificationIcon !== undefined) NotificationIcon = options.notificationIcon;
+    if(options.DefaultProfileIcon !== undefined) DefaultProfileIcon = options.DefaultProfileIcon;
+    if(options.defaultProfileIcon !== undefined) DefaultProfileIcon = options.defaultProfileIcon;
+    if(options.RegisterExpires !== undefined) RegisterExpires = options.RegisterExpires;
+    if(options.RegisterExtraHeaders !== undefined) RegisterExtraHeaders = options.RegisterExtraHeaders;
+    if(options.RegisterExtraContactParams !== undefined) RegisterExtraContactParams = options.RegisterExtraContactParams;
+    if(options.RegisterContactParams !== undefined) RegisterContactParams = options.RegisterContactParams;
+    if(options.WssInTransport !== undefined) WssInTransport = options.WssInTransport;
+    if(options.IpInContact !== undefined) IpInContact = options.IpInContact;
+    if(options.BundlePolicy !== undefined) BundlePolicy = options.BundlePolicy;
+    if(options.IceStunServerJson !== undefined) IceStunServerJson = options.IceStunServerJson;
+    if(options.IceStunCheckTimeout !== undefined) IceStunCheckTimeout = options.IceStunCheckTimeout;
+    if(options.SubscribeBuddyAccept !== undefined) SubscribeBuddyAccept = options.SubscribeBuddyAccept;
+    if(options.SubscribeBuddyEvent !== undefined) SubscribeBuddyEvent = options.SubscribeBuddyEvent;
+    if(options.SubscribeBuddyExpires !== undefined) SubscribeBuddyExpires = options.SubscribeBuddyExpires;
+    if(options.ProfileDisplayPrefix !== undefined) ProfileDisplayPrefix = options.ProfileDisplayPrefix;
+    if(options.ProfileDisplayPrefixSeparator !== undefined) ProfileDisplayPrefixSeparator = options.ProfileDisplayPrefixSeparator;
+    if(options.InviteExtraHeaders !== undefined) InviteExtraHeaders = options.InviteExtraHeaders;
+    if(options.NoAnswerTimeout !== undefined) NoAnswerTimeout = options.NoAnswerTimeout;
+    if(options.AutoAnswerEnabled !== undefined) AutoAnswerEnabled = options.AutoAnswerEnabled;
+    if(options.DoNotDisturbEnabled !== undefined) DoNotDisturbEnabled = options.DoNotDisturbEnabled;
+    if(options.CallWaitingEnabled !== undefined) CallWaitingEnabled = options.CallWaitingEnabled;
+    if(options.RecordAllCalls !== undefined) RecordAllCalls = options.RecordAllCalls;
+    if(options.StartVideoFullScreen !== undefined) StartVideoFullScreen = options.StartVideoFullScreen;
+    if(options.SelectRingingLine !== undefined) SelectRingingLine = options.SelectRingingLine;
+    if(options.UiMaxWidth !== undefined) UiMaxWidth = options.UiMaxWidth;
+    if(options.UiThemeStyle !== undefined) UiThemeStyle = options.UiThemeStyle;
+    if(options.UiMessageLayout !== undefined) UiMessageLayout = options.UiMessageLayout;
+    if(options.UiCustomConfigMenu !== undefined) UiCustomConfigMenu = options.UiCustomConfigMenu;
+    if(options.UiCustomDialButton !== undefined) UiCustomDialButton = options.UiCustomDialButton;
+    if(options.UiCustomSortAndFilterButton !== undefined) UiCustomSortAndFilterButton = options.UiCustomSortAndFilterButton;
+    if(options.UiCustomAddBuddy !== undefined) UiCustomAddBuddy = options.UiCustomAddBuddy;
+    if(options.UiCustomEditBuddy !== undefined) UiCustomEditBuddy = options.UiCustomEditBuddy;
+    if(options.UiCustomMediaSettings !== undefined) UiCustomMediaSettings = options.UiCustomMediaSettings;
+    if(options.UiCustomMessageAction !== undefined) UiCustomMessageAction = options.UiCustomMessageAction;
+    if(options.TraceSip !== undefined) TraceSip = (options.TraceSip == true || options.TraceSip == "1");
+    if(options.HideSettingsButton !== undefined) HideSettingsButton = !!options.HideSettingsButton;
+    if(options.HideRecordAllCallsButton !== undefined) HideRecordAllCallsButton = !!options.HideRecordAllCallsButton;
+    if(options.AutoGainControl !== undefined) AutoGainControl = options.AutoGainControl;
+    if(options.EchoCancellation !== undefined) EchoCancellation = options.EchoCancellation;
+    if(options.NoiseSuppression !== undefined) NoiseSuppression = options.NoiseSuppression;
+    if(options.MirrorVideo !== undefined) MirrorVideo = options.MirrorVideo;
+    if(options.maxFrameRate !== undefined) maxFrameRate = options.maxFrameRate;
+    if(options.videoHeight !== undefined) videoHeight = options.videoHeight;
+    if(options.MaxVideoBandwidth !== undefined) MaxVideoBandwidth = options.MaxVideoBandwidth;
+    if(options.videoAspectRatio !== undefined) videoAspectRatio = options.videoAspectRatio;
+    if(options.NotificationsActive !== undefined) NotificationsActive = options.NotificationsActive;
+    if(options.StreamBuffer !== undefined) StreamBuffer = options.StreamBuffer;
+    if(options.PosterJpegQuality !== undefined) PosterJpegQuality = options.PosterJpegQuality;
+    if(options.VideoResampleSize !== undefined) VideoResampleSize = options.VideoResampleSize;
+    if(options.RecordingVideoSize !== undefined) RecordingVideoSize = options.RecordingVideoSize;
+    if(options.RecordingVideoFps !== undefined) RecordingVideoFps = options.RecordingVideoFps;
+    if(options.RecordingLayout !== undefined) RecordingLayout = options.RecordingLayout;
+    if(options.DidLength !== undefined) DidLength = options.DidLength;
+    if(options.MaxDidLength !== undefined) MaxDidLength = options.MaxDidLength;
+    if(options.DisplayDateFormat !== undefined) DisplayDateFormat = options.DisplayDateFormat;
+    if(options.DisplayTimeFormat !== undefined) DisplayTimeFormat = options.DisplayTimeFormat;
+    if(options.Language !== undefined) Language = options.Language;
+    if(options.BuddySortBy !== undefined) BuddySortBy = options.BuddySortBy;
+    if(options.SortByTypeOrder !== undefined) SortByTypeOrder = options.SortByTypeOrder;
+    if(options.BuddyAutoDeleteAtEnd !== undefined) BuddyAutoDeleteAtEnd = options.BuddyAutoDeleteAtEnd;
+    if(options.HideAutoDeleteBuddies !== undefined) HideAutoDeleteBuddies = options.HideAutoDeleteBuddies;
+    if(options.BuddyShowExtenNum !== undefined) BuddyShowExtenNum = options.BuddyShowExtenNum;
+    if(options.DisableFreeDial !== undefined) DisableFreeDial = options.DisableFreeDial;
+    if(options.DisableBuddies !== undefined) DisableBuddies = options.DisableBuddies;
+    if(options.EnableTransfer !== undefined) EnableTransfer = options.EnableTransfer;
+    if(options.EnableConference !== undefined) EnableConference = options.EnableConference;
+    if(options.AutoAnswerPolicy !== undefined) AutoAnswerPolicy = options.AutoAnswerPolicy;
+    if(options.DoNotDisturbPolicy !== undefined) DoNotDisturbPolicy = options.DoNotDisturbPolicy;
+    if(options.CallWaitingPolicy !== undefined) CallWaitingPolicy = options.CallWaitingPolicy;
+    if(options.CallRecordingPolicy !== undefined) CallRecordingPolicy = options.CallRecordingPolicy;
+    if(options.IntercomPolicy !== undefined) IntercomPolicy = options.IntercomPolicy;
+    if(options.EnableAccountSettings !== undefined) EnableAccountSettings = options.EnableAccountSettings;
+    if(options.EnableAppearanceSettings !== undefined) EnableAppearanceSettings = options.EnableAppearanceSettings;
+    if(options.EnableNotificationSettings !== undefined) EnableNotificationSettings = options.EnableNotificationSettings;
+    if(options.EnableAlphanumericDial !== undefined) EnableAlphanumericDial = options.EnableAlphanumericDial;
+    if(options.EnableVideoCalling !== undefined) EnableVideoCalling = options.EnableVideoCalling;
+    if(options.EnableTextExpressions !== undefined) EnableTextExpressions = options.EnableTextExpressions;
+    if(options.EnableTextDictate !== undefined) EnableTextDictate = options.EnableTextDictate;
+    if(options.EnableRingtone !== undefined) EnableRingtone = options.EnableRingtone;
+    if(options.MaxBuddies !== undefined) MaxBuddies = options.MaxBuddies;
+    if(options.MaxBuddyAge !== undefined) MaxBuddyAge = options.MaxBuddyAge;
+    setRuntimeMediaConfigFromOptions(options);
 
-        normalizedSipAuth = NormalizeSipPasswordAndType(SipPassword, null);
-        SipPassword = normalizedSipAuth.password;
-        SipPasswordType = normalizedSipAuth.type;
-        EnsureBuddyStorageKeys();
-        RemoveSeedSampleStorageData();
-        applyRuntimeDocumentIcons();
-        if(SingleInstance == true){
-            console.log("Instance ID :", instanceID);
-            localDB.setItem("InstanceId", instanceID);
-            window.addEventListener('storage', onLocalStorageEvent, false);
-        }
-        var embeddedLangPacks = (typeof window !== "undefined" && window.__VPhoneLangPacks && typeof window.__VPhoneLangPacks === "object")
-            ? window.__VPhoneLangPacks
-            : null;
+    normalizedSipAuth = NormalizeSipPasswordAndType(SipPassword, null);
+    SipPassword = normalizedSipAuth.password;
+    SipPasswordType = normalizedSipAuth.type;
+    EnsureBuddyStorageKeys();
+    RemoveSeedSampleStorageData();
+    applyRuntimeDocumentIcons();
+    if(SingleInstance == true){
+        console.log("Instance ID :", instanceID);
+        localDB.setItem("InstanceId", instanceID);
+        window.addEventListener('storage', onLocalStorageEvent, false);
+    }
+    var embeddedLangPacks = (typeof window !== "undefined" && window.__VPhoneLangPacks && typeof window.__VPhoneLangPacks === "object")
+        ? window.__VPhoneLangPacks
+        : null;
 
-        if(embeddedLangPacks && embeddedLangPacks.en){
-            console.log("Using embedded language packs");
-            lang = ResolveLanguageFromPacks(embeddedLangPacks.en, embeddedLangPacks);
+    if(embeddedLangPacks && embeddedLangPacks.en){
+        console.log("Using embedded language packs");
+        lang = ResolveLanguageFromPacks(embeddedLangPacks.en, embeddedLangPacks);
+        if(typeof web_hook_on_language_pack_loaded !== 'undefined') web_hook_on_language_pack_loaded(lang);
+        InitUi();
+    }
+    else {
+        $.getJSON(hostingPrefix + "lang/en.json", function(data){
+            lang = data;
             if(typeof web_hook_on_language_pack_loaded !== 'undefined') web_hook_on_language_pack_loaded(lang);
-            InitUi();
-        }
-        else {
-            $.getJSON(hostingPrefix + "lang/en.json", function(data){
-                lang = data;
-                if(typeof web_hook_on_language_pack_loaded !== 'undefined') web_hook_on_language_pack_loaded(lang);
-                var userLang = GetAlternateLanguage();
-                var forceAlternateLang = (String(Language || "").toLowerCase() != "" && String(Language || "").toLowerCase() != "auto" && String(Language || "").toLowerCase() != "en");
-                if((loadAlternateLang == true || forceAlternateLang == true) && userLang != ""){
-                    console.log("Loading Alternate Language Pack: ", userLang);
-                    $.getJSON(hostingPrefix +"lang/"+ userLang +".json", function (alt_data){
-                        if(typeof web_hook_on_language_pack_loaded !== 'undefined') web_hook_on_language_pack_loaded(alt_data);
-                        lang = Object.assign({}, data, alt_data);
-                    }).always(function() {
-                        console.log("Alternate Language Pack loaded: ", lang);
-                        InitUi();
-                    });
-                }
-                else {
-                    if(userLang == "") console.log("No Alternate Language Found.");
+            var userLang = GetAlternateLanguage();
+            var forceAlternateLang = (String(Language || "").toLowerCase() != "" && String(Language || "").toLowerCase() != "auto" && String(Language || "").toLowerCase() != "en");
+            if((loadAlternateLang == true || forceAlternateLang == true) && userLang != ""){
+                console.log("Loading Alternate Language Pack: ", userLang);
+                $.getJSON(hostingPrefix +"lang/"+ userLang +".json", function (alt_data){
+                    if(typeof web_hook_on_language_pack_loaded !== 'undefined') web_hook_on_language_pack_loaded(alt_data);
+                    lang = Object.assign({}, data, alt_data);
+                }).always(function() {
+                    console.log("Alternate Language Pack loaded: ", lang);
                     InitUi();
-                }
-            });
-        }
-    }, 0);
+                });
+            }
+            else {
+                if(userLang == "") console.log("No Alternate Language Found.");
+                InitUi();
+            }
+        });
+    }
 });
 if(window.matchMedia){
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e){
@@ -1740,21 +1265,6 @@ if(window.matchMedia){
         ApplyThemeColor()
     });
 }
-
-// Global exports shim for backwards compatibility
-if (typeof globalThis !== 'undefined') { globalThis.GetKeyboardShortcutAction = GetKeyboardShortcutAction; }
-if (typeof window !== 'undefined') { window.GetKeyboardShortcutAction = GetKeyboardShortcutAction; }
-if (typeof globalThis !== 'undefined') { globalThis.IsEditableShortcutTarget = IsEditableShortcutTarget; }
-if (typeof window !== 'undefined') { window.IsEditableShortcutTarget = IsEditableShortcutTarget; }
-if (typeof globalThis !== 'undefined') { globalThis.GetShortcutLine = GetShortcutLine; }
-if (typeof window !== 'undefined') { window.GetShortcutLine = GetShortcutLine; }
-if (typeof globalThis !== 'undefined') { globalThis.HandleKeyboardShortcut = HandleKeyboardShortcut; }
-if (typeof window !== 'undefined') { window.HandleKeyboardShortcut = HandleKeyboardShortcut; }
-if (typeof globalThis !== 'undefined') { globalThis.HandleShortcutAction = HandleShortcutAction; }
-if (typeof window !== 'undefined') { window.HandleShortcutAction = HandleShortcutAction; }
-
-
-// File: 05_indexeddb.js
 function onLocalStorageEvent(event){
     if(event.key == "InstanceId"){
 
@@ -1851,15 +1361,6 @@ function PrepareIndexDB(){
         console.log("IndexDB connected to CallRecordings");
     }
 }
-
-// Global exports shim for backwards compatibility
-if (typeof globalThis !== 'undefined') { globalThis.onLocalStorageEvent = onLocalStorageEvent; }
-if (typeof window !== 'undefined') { window.onLocalStorageEvent = onLocalStorageEvent; }
-if (typeof globalThis !== 'undefined') { globalThis.PrepareIndexDB = PrepareIndexDB; }
-if (typeof window !== 'undefined') { window.PrepareIndexDB = PrepareIndexDB; }
-
-
-// File: 06_ui_windows.js
 function UpdateUI(){
     var windowWidth = $(window).outerWidth()
     var windowHeight = $(window).outerHeight();
@@ -2383,23 +1884,6 @@ function EditBuddyWindow(buddy){
         });
     });
 }
-
-// Global exports shim for backwards compatibility
-if (typeof globalThis !== 'undefined') { globalThis.UpdateUI = UpdateUI; }
-if (typeof window !== 'undefined') { window.UpdateUI = UpdateUI; }
-if (typeof globalThis !== 'undefined') { globalThis.AddSomeoneWindow = AddSomeoneWindow; }
-if (typeof window !== 'undefined') { window.AddSomeoneWindow = AddSomeoneWindow; }
-if (typeof globalThis !== 'undefined') { globalThis.CreateGroupWindow = CreateGroupWindow; }
-if (typeof window !== 'undefined') { window.CreateGroupWindow = CreateGroupWindow; }
-if (typeof globalThis !== 'undefined') { globalThis.checkNotificationPromise = checkNotificationPromise; }
-if (typeof window !== 'undefined') { window.checkNotificationPromise = checkNotificationPromise; }
-if (typeof globalThis !== 'undefined') { globalThis.HandleNotifyPermission = HandleNotifyPermission; }
-if (typeof window !== 'undefined') { window.HandleNotifyPermission = HandleNotifyPermission; }
-if (typeof globalThis !== 'undefined') { globalThis.EditBuddyWindow = EditBuddyWindow; }
-if (typeof window !== 'undefined') { window.EditBuddyWindow = EditBuddyWindow; }
-
-
-// File: 07_init_ui.js
 function InitUi(){
     if(typeof web_hook_on_before_init !== 'undefined') web_hook_on_before_init(phoneOptions);
 
@@ -2677,13 +2161,6 @@ function InitUi(){
         console.warn("SIP account is not configured; open Settings to configure extension details.");
     }
 }
-
-// Global exports shim for backwards compatibility
-if (typeof globalThis !== 'undefined') { globalThis.InitUi = InitUi; }
-if (typeof window !== 'undefined') { window.InitUi = InitUi; }
-
-
-// File: 08_sip_status.js
 function ShowMyProfileMenu(obj){
     var enabledHtml = " <i class=\"fa fa-check\" style=\"float: right; line-height: 18px;\"></i>";
 
@@ -2830,31 +2307,6 @@ function ApplyThemeColor(){
     $("#colorSchemeModeSheet").text(wallpaperStyle);
 }
 
-
-// Global exports shim for backwards compatibility
-if (typeof globalThis !== 'undefined') { globalThis.ShowMyProfileMenu = ShowMyProfileMenu; }
-if (typeof window !== 'undefined') { window.ShowMyProfileMenu = ShowMyProfileMenu; }
-if (typeof globalThis !== 'undefined') { globalThis.IsSipRegistered = IsSipRegistered; }
-if (typeof window !== 'undefined') { window.IsSipRegistered = IsSipRegistered; }
-if (typeof globalThis !== 'undefined') { globalThis.CountOnlineExtensions = CountOnlineExtensions; }
-if (typeof window !== 'undefined') { window.CountOnlineExtensions = CountOnlineExtensions; }
-if (typeof globalThis !== 'undefined') { globalThis.GetRegisteredExtension = GetRegisteredExtension; }
-if (typeof window !== 'undefined') { window.GetRegisteredExtension = GetRegisteredExtension; }
-if (typeof globalThis !== 'undefined') { globalThis.GetSelfExtensionLabel = GetSelfExtensionLabel; }
-if (typeof window !== 'undefined') { window.GetSelfExtensionLabel = GetSelfExtensionLabel; }
-if (typeof globalThis !== 'undefined') { globalThis.ApplyRegistrationStatusText = ApplyRegistrationStatusText; }
-if (typeof window !== 'undefined') { window.ApplyRegistrationStatusText = ApplyRegistrationStatusText; }
-if (typeof globalThis !== 'undefined') { globalThis.EmitEmbedRegistrationStatus = EmitEmbedRegistrationStatus; }
-if (typeof window !== 'undefined') { window.EmitEmbedRegistrationStatus = EmitEmbedRegistrationStatus; }
-if (typeof globalThis !== 'undefined') { globalThis.EmitEmbedPhoneEvent = EmitEmbedPhoneEvent; }
-if (typeof window !== 'undefined') { window.EmitEmbedPhoneEvent = EmitEmbedPhoneEvent; }
-if (typeof globalThis !== 'undefined') { globalThis.SetStatusMessage = SetStatusMessage; }
-if (typeof window !== 'undefined') { window.SetStatusMessage = SetStatusMessage; }
-if (typeof globalThis !== 'undefined') { globalThis.ApplyThemeColor = ApplyThemeColor; }
-if (typeof window !== 'undefined') { window.ApplyThemeColor = ApplyThemeColor; }
-
-
-// File: 09_media_preload.js
 function ResolveEmbeddedMediaUrl(fileName, fallbackUrl){
     if(embeddedMediaMap && embeddedMediaMap[fileName]){
         return embeddedMediaMap[fileName];
@@ -3107,39 +2559,6 @@ function playSessionHoldMusic(session){
         console.warn("Unable to play hold music", e);
     }
 }
-
-// Global exports shim for backwards compatibility
-if (typeof globalThis !== 'undefined') { globalThis.ResolveEmbeddedMediaUrl = ResolveEmbeddedMediaUrl; }
-if (typeof window !== 'undefined') { window.ResolveEmbeddedMediaUrl = ResolveEmbeddedMediaUrl; }
-if (typeof globalThis !== 'undefined') { globalThis.warmAudioCache = warmAudioCache; }
-if (typeof window !== 'undefined') { window.warmAudioCache = warmAudioCache; }
-if (typeof globalThis !== 'undefined') { globalThis.sanitizeMediaConfigValue = sanitizeMediaConfigValue; }
-if (typeof window !== 'undefined') { window.sanitizeMediaConfigValue = sanitizeMediaConfigValue; }
-if (typeof globalThis !== 'undefined') { globalThis.getFirstDefinedMediaConfigValue = getFirstDefinedMediaConfigValue; }
-if (typeof window !== 'undefined') { window.getFirstDefinedMediaConfigValue = getFirstDefinedMediaConfigValue; }
-if (typeof globalThis !== 'undefined') { globalThis.normalizeMediaConfig = normalizeMediaConfig; }
-if (typeof window !== 'undefined') { window.normalizeMediaConfig = normalizeMediaConfig; }
-if (typeof globalThis !== 'undefined') { globalThis.getStoredMediaConfig = getStoredMediaConfig; }
-if (typeof window !== 'undefined') { window.getStoredMediaConfig = getStoredMediaConfig; }
-if (typeof globalThis !== 'undefined') { globalThis.getEffectiveMediaConfig = getEffectiveMediaConfig; }
-if (typeof window !== 'undefined') { window.getEffectiveMediaConfig = getEffectiveMediaConfig; }
-if (typeof globalThis !== 'undefined') { globalThis.resolveMediaAssetUrl = resolveMediaAssetUrl; }
-if (typeof window !== 'undefined') { window.resolveMediaAssetUrl = resolveMediaAssetUrl; }
-if (typeof globalThis !== 'undefined') { globalThis.arrayBufferToBase64 = arrayBufferToBase64; }
-if (typeof window !== 'undefined') { window.arrayBufferToBase64 = arrayBufferToBase64; }
-if (typeof globalThis !== 'undefined') { globalThis.audioBufferToWavDataUri = audioBufferToWavDataUri; }
-if (typeof window !== 'undefined') { window.audioBufferToWavDataUri = audioBufferToWavDataUri; }
-if (typeof globalThis !== 'undefined') { globalThis.setRuntimeMediaConfigFromOptions = setRuntimeMediaConfigFromOptions; }
-if (typeof window !== 'undefined') { window.setRuntimeMediaConfigFromOptions = setRuntimeMediaConfigFromOptions; }
-if (typeof globalThis !== 'undefined') { globalThis.PreloadAudioFiles = PreloadAudioFiles; }
-if (typeof window !== 'undefined') { window.PreloadAudioFiles = PreloadAudioFiles; }
-if (typeof globalThis !== 'undefined') { globalThis.stopSessionHoldMusic = stopSessionHoldMusic; }
-if (typeof window !== 'undefined') { window.stopSessionHoldMusic = stopSessionHoldMusic; }
-if (typeof globalThis !== 'undefined') { globalThis.playSessionHoldMusic = playSessionHoldMusic; }
-if (typeof window !== 'undefined') { window.playSessionHoldMusic = playSessionHoldMusic; }
-
-
-// File: 10_sip_client.js
 function CreateUserAgent() {
     console.log("Creating User Agent...");
     normalizedSipAuth = NormalizeSipPasswordAndType(SipPassword, SipPasswordType);
@@ -3502,35 +2921,6 @@ function onUnregistered(){
     }
     userAgent.isReRegister = false;
 }
-
-// Global exports shim for backwards compatibility
-if (typeof globalThis !== 'undefined') { globalThis.CreateUserAgent = CreateUserAgent; }
-if (typeof window !== 'undefined') { window.CreateUserAgent = CreateUserAgent; }
-if (typeof globalThis !== 'undefined') { globalThis.IsTransportReady = IsTransportReady; }
-if (typeof window !== 'undefined') { window.IsTransportReady = IsTransportReady; }
-if (typeof globalThis !== 'undefined') { globalThis.onTransportConnected = onTransportConnected; }
-if (typeof window !== 'undefined') { window.onTransportConnected = onTransportConnected; }
-if (typeof globalThis !== 'undefined') { globalThis.onTransportConnectError = onTransportConnectError; }
-if (typeof window !== 'undefined') { window.onTransportConnectError = onTransportConnectError; }
-if (typeof globalThis !== 'undefined') { globalThis.onTransportDisconnected = onTransportDisconnected; }
-if (typeof window !== 'undefined') { window.onTransportDisconnected = onTransportDisconnected; }
-if (typeof globalThis !== 'undefined') { globalThis.DisconnectTransport = DisconnectTransport; }
-if (typeof window !== 'undefined') { window.DisconnectTransport = DisconnectTransport; }
-if (typeof globalThis !== 'undefined') { globalThis.ReconnectTransport = ReconnectTransport; }
-if (typeof window !== 'undefined') { window.ReconnectTransport = ReconnectTransport; }
-if (typeof globalThis !== 'undefined') { globalThis.Register = Register; }
-if (typeof window !== 'undefined') { window.Register = Register; }
-if (typeof globalThis !== 'undefined') { globalThis.Unregister = Unregister; }
-if (typeof window !== 'undefined') { window.Unregister = Unregister; }
-if (typeof globalThis !== 'undefined') { globalThis.onRegistered = onRegistered; }
-if (typeof window !== 'undefined') { window.onRegistered = onRegistered; }
-if (typeof globalThis !== 'undefined') { globalThis.onRegisterFailed = onRegisterFailed; }
-if (typeof window !== 'undefined') { window.onRegisterFailed = onRegisterFailed; }
-if (typeof globalThis !== 'undefined') { globalThis.onUnregistered = onUnregistered; }
-if (typeof window !== 'undefined') { window.onUnregistered = onUnregistered; }
-
-
-// File: 11_call_sessions.js
 function ReceiveCall(session) {
     var callerID = session.remoteIdentity.displayName;
     var did = session.remoteIdentity.uri.user;
@@ -3862,31 +3252,11 @@ function AnswerAudioCall(lineNumber) {
         session.data.ringerObj = null;
     }
     if(HasAudioDevice == false){
-        if(navigator.mediaDevices && navigator.mediaDevices.getUserMedia){
-            navigator.mediaDevices.getUserMedia({ audio: true, video: false })
-                .then(function(stream){
-                    stream.getTracks().forEach(function(t){ t.stop(); });
-                    return navigator.mediaDevices.enumerateDevices();
-                })
-                .then(function(deviceInfos){
-                    _applyDeviceList(deviceInfos);
-                    if(HasAudioDevice){
-                        AnswerAudioCall(lineNumber);
-                    } else {
-                        Alert(lang.alert_no_microphone);
-                        $("#line-" + lineObj.LineNumber + "-msg").html(lang.call_failed);
-                        $("#line-" + lineObj.LineNumber + "-AnswerCall").hide();
-                    }
-                })
-                .catch(function(){ Alert(lang.alert_no_microphone); });
-        } else {
-            Alert(lang.alert_no_microphone);
-            $("#line-" + lineObj.LineNumber + "-msg").html(lang.call_failed);
-            $("#line-" + lineObj.LineNumber + "-AnswerCall").hide();
-        }
+        Alert(lang.alert_no_microphone);
+        $("#line-" + lineObj.LineNumber + "-msg").html(lang.call_failed);
+        $("#line-" + lineObj.LineNumber + "-AnswerCall").hide();
         return;
     }
-
     $("#line-" + lineObj.LineNumber + "-AnswerCall").hide();
     var supportedConstraints = navigator.mediaDevices.getSupportedConstraints();
     var spdOptions = {
@@ -3956,28 +3326,9 @@ function AnswerVideoCall(lineNumber) {
         session.data.ringerObj = null;
     }
     if(HasAudioDevice == false){
-        if(navigator.mediaDevices && navigator.mediaDevices.getUserMedia){
-            navigator.mediaDevices.getUserMedia({ audio: true, video: false })
-                .then(function(stream){
-                    stream.getTracks().forEach(function(t){ t.stop(); });
-                    return navigator.mediaDevices.enumerateDevices();
-                })
-                .then(function(deviceInfos){
-                    _applyDeviceList(deviceInfos);
-                    if(HasAudioDevice){
-                        AnswerVideoCall(lineNumber);
-                    } else {
-                        Alert(lang.alert_no_microphone);
-                        $("#line-" + lineObj.LineNumber + "-msg").html(lang.call_failed);
-                        $("#line-" + lineObj.LineNumber + "-AnswerCall").hide();
-                    }
-                })
-                .catch(function(){ Alert(lang.alert_no_microphone); });
-        } else {
-            Alert(lang.alert_no_microphone);
-            $("#line-" + lineObj.LineNumber + "-msg").html(lang.call_failed);
-            $("#line-" + lineObj.LineNumber + "-AnswerCall").hide();
-        }
+        Alert(lang.alert_no_microphone);
+        $("#line-" + lineObj.LineNumber + "-msg").html(lang.call_failed);
+        $("#line-" + lineObj.LineNumber + "-AnswerCall").hide();
         return;
     }
     $("#line-" + lineObj.LineNumber + "-AnswerCall").hide();
@@ -5201,55 +4552,6 @@ function DeleteQosData(buddy, stream){
         console.warn("CallQosDataIndexDb is null.");
     }
 }
-
-// Global exports shim for backwards compatibility
-if (typeof globalThis !== 'undefined') { globalThis.ReceiveCall = ReceiveCall; }
-if (typeof window !== 'undefined') { window.ReceiveCall = ReceiveCall; }
-if (typeof globalThis !== 'undefined') { globalThis.AnswerAudioCall = AnswerAudioCall; }
-if (typeof window !== 'undefined') { window.AnswerAudioCall = AnswerAudioCall; }
-if (typeof globalThis !== 'undefined') { globalThis.AnswerVideoCall = AnswerVideoCall; }
-if (typeof window !== 'undefined') { window.AnswerVideoCall = AnswerVideoCall; }
-if (typeof globalThis !== 'undefined') { globalThis.RejectCall = RejectCall; }
-if (typeof window !== 'undefined') { window.RejectCall = RejectCall; }
-if (typeof globalThis !== 'undefined') { globalThis.onInviteCancel = onInviteCancel; }
-if (typeof window !== 'undefined') { window.onInviteCancel = onInviteCancel; }
-if (typeof globalThis !== 'undefined') { globalThis.onInviteAccepted = onInviteAccepted; }
-if (typeof window !== 'undefined') { window.onInviteAccepted = onInviteAccepted; }
-if (typeof globalThis !== 'undefined') { globalThis.onInviteTrying = onInviteTrying; }
-if (typeof window !== 'undefined') { window.onInviteTrying = onInviteTrying; }
-if (typeof globalThis !== 'undefined') { globalThis.onInviteProgress = onInviteProgress; }
-if (typeof window !== 'undefined') { window.onInviteProgress = onInviteProgress; }
-if (typeof globalThis !== 'undefined') { globalThis.onInviteRejected = onInviteRejected; }
-if (typeof window !== 'undefined') { window.onInviteRejected = onInviteRejected; }
-if (typeof globalThis !== 'undefined') { globalThis.onInviteRedirected = onInviteRedirected; }
-if (typeof window !== 'undefined') { window.onInviteRedirected = onInviteRedirected; }
-if (typeof globalThis !== 'undefined') { globalThis.onSessionReceivedBye = onSessionReceivedBye; }
-if (typeof window !== 'undefined') { window.onSessionReceivedBye = onSessionReceivedBye; }
-if (typeof globalThis !== 'undefined') { globalThis.onSessionReinvited = onSessionReinvited; }
-if (typeof window !== 'undefined') { window.onSessionReinvited = onSessionReinvited; }
-if (typeof globalThis !== 'undefined') { globalThis.onSessionReceivedMessage = onSessionReceivedMessage; }
-if (typeof window !== 'undefined') { window.onSessionReceivedMessage = onSessionReceivedMessage; }
-if (typeof globalThis !== 'undefined') { globalThis.onSessionDescriptionHandlerCreated = onSessionDescriptionHandlerCreated; }
-if (typeof window !== 'undefined') { window.onSessionDescriptionHandlerCreated = onSessionDescriptionHandlerCreated; }
-if (typeof globalThis !== 'undefined') { globalThis.onTrackAddedEvent = onTrackAddedEvent; }
-if (typeof window !== 'undefined') { window.onTrackAddedEvent = onTrackAddedEvent; }
-if (typeof globalThis !== 'undefined') { globalThis.teardownSession = teardownSession; }
-if (typeof window !== 'undefined') { window.teardownSession = teardownSession; }
-if (typeof globalThis !== 'undefined') { globalThis.StartRemoteAudioMediaMonitoring = StartRemoteAudioMediaMonitoring; }
-if (typeof window !== 'undefined') { window.StartRemoteAudioMediaMonitoring = StartRemoteAudioMediaMonitoring; }
-if (typeof globalThis !== 'undefined') { globalThis.StartLocalAudioMediaMonitoring = StartLocalAudioMediaMonitoring; }
-if (typeof window !== 'undefined') { window.StartLocalAudioMediaMonitoring = StartLocalAudioMediaMonitoring; }
-if (typeof globalThis !== 'undefined') { globalThis.SoundMeter = SoundMeter; }
-if (typeof window !== 'undefined') { window.SoundMeter = SoundMeter; }
-if (typeof globalThis !== 'undefined') { globalThis.MeterSettingsOutput = MeterSettingsOutput; }
-if (typeof window !== 'undefined') { window.MeterSettingsOutput = MeterSettingsOutput; }
-if (typeof globalThis !== 'undefined') { globalThis.SaveQosData = SaveQosData; }
-if (typeof window !== 'undefined') { window.SaveQosData = SaveQosData; }
-if (typeof globalThis !== 'undefined') { globalThis.DeleteQosData = DeleteQosData; }
-if (typeof window !== 'undefined') { window.DeleteQosData = DeleteQosData; }
-
-
-// File: 12_blf_subscription.js
 function SubscribeAll() {
     if(!userAgent.isRegistered()) return;
 
@@ -5608,33 +4910,6 @@ var ObservedUser = xml.find("dialog-info").attr("entity");
     }
     if(typeof web_hook_on_notify !== 'undefined')  web_hook_on_notify(ContentType, buddyObj, notification.request.body);
 }
-
-// Global exports shim for backwards compatibility
-if (typeof globalThis !== 'undefined') { globalThis.SubscribeAll = SubscribeAll; }
-if (typeof window !== 'undefined') { window.SubscribeAll = SubscribeAll; }
-if (typeof globalThis !== 'undefined') { globalThis.SelfSubscribe = SelfSubscribe; }
-if (typeof window !== 'undefined') { window.SelfSubscribe = SelfSubscribe; }
-if (typeof globalThis !== 'undefined') { globalThis.SubscribeVoicemail = SubscribeVoicemail; }
-if (typeof window !== 'undefined') { window.SubscribeVoicemail = SubscribeVoicemail; }
-if (typeof globalThis !== 'undefined') { globalThis.SubscribeBuddy = SubscribeBuddy; }
-if (typeof window !== 'undefined') { window.SubscribeBuddy = SubscribeBuddy; }
-if (typeof globalThis !== 'undefined') { globalThis.UnsubscribeAll = UnsubscribeAll; }
-if (typeof window !== 'undefined') { window.UnsubscribeAll = UnsubscribeAll; }
-if (typeof globalThis !== 'undefined') { globalThis.UnsubscribeBlf = UnsubscribeBlf; }
-if (typeof window !== 'undefined') { window.UnsubscribeBlf = UnsubscribeBlf; }
-if (typeof globalThis !== 'undefined') { globalThis.UnsubscribeVoicemail = UnsubscribeVoicemail; }
-if (typeof window !== 'undefined') { window.UnsubscribeVoicemail = UnsubscribeVoicemail; }
-if (typeof globalThis !== 'undefined') { globalThis.SelfUnsubscribe = SelfUnsubscribe; }
-if (typeof window !== 'undefined') { window.SelfUnsubscribe = SelfUnsubscribe; }
-if (typeof globalThis !== 'undefined') { globalThis.UnsubscribeBuddy = UnsubscribeBuddy; }
-if (typeof window !== 'undefined') { window.UnsubscribeBuddy = UnsubscribeBuddy; }
-if (typeof globalThis !== 'undefined') { globalThis.VoicemailNotify = VoicemailNotify; }
-if (typeof window !== 'undefined') { window.VoicemailNotify = VoicemailNotify; }
-if (typeof globalThis !== 'undefined') { globalThis.ReceiveNotify = ReceiveNotify; }
-if (typeof window !== 'undefined') { window.ReceiveNotify = ReceiveNotify; }
-
-
-// File: 13_chat_stream.js
 function InitialiseStream(buddy){
     var template = { TotalRows:0, DataCollection:[] }
     localDB.setItem(buddy + "-stream", JSON.stringify(template));
@@ -5838,50 +5113,6 @@ function ClearMissedBadge(buddy) {
 
     if(typeof web_hook_on_missed_notify !== 'undefined') web_hook_on_missed_notify(buddyObj.missed);
 }
-
-// Global exports shim for backwards compatibility
-if (typeof globalThis !== 'undefined') { globalThis.InitialiseStream = InitialiseStream; }
-if (typeof window !== 'undefined') { window.InitialiseStream = InitialiseStream; }
-if (typeof globalThis !== 'undefined') { globalThis.EnforceRecentRecordLimit = EnforceRecentRecordLimit; }
-if (typeof window !== 'undefined') { window.EnforceRecentRecordLimit = EnforceRecentRecordLimit; }
-if (typeof globalThis !== 'undefined') { globalThis.AddCallMessage = AddCallMessage; }
-if (typeof window !== 'undefined') { window.AddCallMessage = AddCallMessage; }
-if (typeof globalThis !== 'undefined') { globalThis.SendImageDataMessage = SendImageDataMessage; }
-if (typeof window !== 'undefined') { window.SendImageDataMessage = SendImageDataMessage; }
-if (typeof globalThis !== 'undefined') { globalThis.updateLineScroll = updateLineScroll; }
-if (typeof window !== 'undefined') { window.updateLineScroll = updateLineScroll; }
-if (typeof globalThis !== 'undefined') { globalThis.updateScroll = updateScroll; }
-if (typeof window !== 'undefined') { window.updateScroll = updateScroll; }
-if (typeof globalThis !== 'undefined') { globalThis.IncreaseMissedBadge = IncreaseMissedBadge; }
-if (typeof window !== 'undefined') { window.IncreaseMissedBadge = IncreaseMissedBadge; }
-if (typeof globalThis !== 'undefined') { globalThis.UpdateBuddyActivity = UpdateBuddyActivity; }
-if (typeof window !== 'undefined') { window.UpdateBuddyActivity = UpdateBuddyActivity; }
-if (typeof globalThis !== 'undefined') { globalThis.ClearMissedBadge = ClearMissedBadge; }
-if (typeof window !== 'undefined') { window.ClearMissedBadge = ClearMissedBadge; }
-
-
-// File: 14_call_controls.js
-function _cleanupFailedCall(lineObj) {
-    if(!lineObj) return;
-    console.log("Cleaning up failed/stuck call on line:", lineObj.LineNumber);
-    RemoveLine(lineObj);
-    if(window.ReturnToDialpadAfterCall === true && Lines.length === 0){
-        var returnTab = lineObj.ReturnToTab || window.ReturnAfterCallTab || "dialpad";
-        if(returnTab != "contacts" && returnTab != "recents" && returnTab != "dialpad") returnTab = "dialpad";
-        selectedLine = null;
-        selectedBuddy = null;
-        $(".buddySelected").prop("class", "buddy");
-        $(".streamSelected").prop("class", "stream");
-        ShowTab(returnTab);
-        localDB.setItem("ActiveTab", returnTab);
-        UpdateUI();
-        window.ReturnToDialpadAfterCall = false;
-        window.ReturnAfterCallTab = null;
-    }
-}
-if (typeof globalThis !== 'undefined') { globalThis._cleanupFailedCall = _cleanupFailedCall; }
-if (typeof window !== 'undefined') { window._cleanupFailedCall = _cleanupFailedCall; }
-
 function VideoCall(lineObj, dialledNumber, extraHeaders) {
     if(userAgent == null) return;
     if(!userAgent.isRegistered()) return;
@@ -5889,7 +5120,6 @@ function VideoCall(lineObj, dialledNumber, extraHeaders) {
 
     if(HasAudioDevice == false){
         Alert(lang.alert_no_microphone);
-        _cleanupFailedCall(lineObj);
         return;
     }
 
@@ -5985,14 +5215,7 @@ function VideoCall(lineObj, dialledNumber, extraHeaders) {
     console.log("INVITE (video): " + dialledNumber + "@" + SipDomain);
 
     var targetURI = SIP.UserAgent.makeURI("sip:" + dialledNumber.replace(/#/g, "%23") + "@" + SipDomain);
-    try {
-        lineObj.SipSession = new SIP.Inviter(userAgent, targetURI, spdOptions);
-    } catch(e) {
-        console.error("Failed to create SIP.Inviter (video):", e);
-        Alert(lang.alert_no_microphone || "Call initialization failed");
-        _cleanupFailedCall(lineObj);
-        return;
-    }
+    lineObj.SipSession = new SIP.Inviter(userAgent, targetURI, spdOptions);
     lineObj.SipSession.data = {}
     lineObj.SipSession.data.line = lineObj.LineNumber;
     lineObj.SipSession.data.buddyId = lineObj.BuddyObj.identity;
@@ -6131,32 +5354,7 @@ function AudioCall(lineObj, dialledNumber, extraHeaders) {
     if(lineObj == null) return;
 
     if(HasAudioDevice == false){
-        // No microphone detected yet — try requesting permission first.
-        if(navigator.mediaDevices && navigator.mediaDevices.getUserMedia){
-            navigator.mediaDevices.getUserMedia({ audio: true, video: false })
-                .then(function(stream){
-                    stream.getTracks().forEach(function(t){ t.stop(); });
-                    return navigator.mediaDevices.enumerateDevices();
-                })
-                .then(function(deviceInfos){
-                    _applyDeviceList(deviceInfos);
-                    if(HasAudioDevice){
-                        // Permission granted — retry the call.
-                        AudioCall(lineObj, dialledNumber, extraHeaders);
-                    } else {
-                        Alert(lang.alert_no_microphone);
-                        _cleanupFailedCall(lineObj);
-                    }
-                })
-                .catch(function(e){
-                    console.warn("Microphone permission denied:", e.name);
-                    Alert(lang.alert_no_microphone);
-                    _cleanupFailedCall(lineObj);
-                });
-        } else {
-            Alert(lang.alert_no_microphone);
-            _cleanupFailedCall(lineObj);
-        }
+        Alert(lang.alert_no_microphone);
         return;
     }
 
@@ -6221,14 +5419,7 @@ function AudioCall(lineObj, dialledNumber, extraHeaders) {
     console.log("INVITE (audio): " + dialledNumber + "@" + SipDomain);
 
     var targetURI = SIP.UserAgent.makeURI("sip:" + dialledNumber.replace(/#/g, "%23") + "@" + SipDomain);
-    try {
-        lineObj.SipSession = new SIP.Inviter(userAgent, targetURI, spdOptions);
-    } catch(e) {
-        console.error("Failed to create SIP.Inviter (audio):", e);
-        Alert(lang.alert_no_microphone || "Call initialization failed");
-        _cleanupFailedCall(lineObj);
-        return;
-    }
+    lineObj.SipSession = new SIP.Inviter(userAgent, targetURI, spdOptions);
     lineObj.SipSession.data = {}
     lineObj.SipSession.data.line = lineObj.LineNumber;
     lineObj.SipSession.data.buddyId = lineObj.BuddyObj.identity;
@@ -6285,10 +5476,7 @@ function AudioCall(lineObj, dialledNumber, extraHeaders) {
     }
     lineObj.SipSession.invite(inviterOptions).catch(function(e){
         console.warn("Failed to send INVITE:", e);
-        if(!lineObj.SipSession.data.reasonText) lineObj.SipSession.data.reasonText = "Media Error";
-        if(!lineObj.SipSession.data.reasonCode) lineObj.SipSession.data.reasonCode = 500;
-        if(!lineObj.SipSession.data.terminateby) lineObj.SipSession.data.terminateby = "local";
-        teardownSession(lineObj);
+
     });
 
     $("#line-" + lineObj.LineNumber + "-btn-settings").removeAttr('disabled');
@@ -7313,11 +6501,7 @@ function ConferenceDial(lineNum){
 
 function cancelSession(lineNum) {
     var lineObj = FindLineByNumber(lineNum);
-    if(lineObj == null) return;
-    if(lineObj.SipSession == null) {
-        _cleanupFailedCall(lineObj);
-        return;
-    }
+    if(lineObj == null || lineObj.SipSession == null) return;
 
     lineObj.SipSession.data.terminateby = "us";
     lineObj.SipSession.data.reasonCode = 0;
@@ -7561,11 +6745,7 @@ function UnmuteSession(lineNum){
 }
 function endSession(lineNum) {
     var lineObj = FindLineByNumber(lineNum);
-    if(lineObj == null) return;
-    if(lineObj.SipSession == null) {
-        _cleanupFailedCall(lineObj);
-        return;
-    }
+    if(lineObj == null || lineObj.SipSession == null) return;
 
     console.log("Ending call with: "+ lineNum);
     lineObj.SipSession.data.terminateby = "us";
@@ -8100,85 +7280,6 @@ function SendNumpadDtmf(lineNum){
     }
     input.val("").focus();
 }
-
-// Global exports shim for backwards compatibility
-if (typeof globalThis !== 'undefined') { globalThis.VideoCall = VideoCall; }
-if (typeof window !== 'undefined') { window.VideoCall = VideoCall; }
-if (typeof globalThis !== 'undefined') { globalThis.AudioCallMenu = AudioCallMenu; }
-if (typeof window !== 'undefined') { window.AudioCallMenu = AudioCallMenu; }
-if (typeof globalThis !== 'undefined') { globalThis.AudioCall = AudioCall; }
-if (typeof window !== 'undefined') { window.AudioCall = AudioCall; }
-if (typeof globalThis !== 'undefined') { globalThis.countSessions = countSessions; }
-if (typeof window !== 'undefined') { window.countSessions = countSessions; }
-if (typeof globalThis !== 'undefined') { globalThis.StopRecording = StopRecording; }
-if (typeof window !== 'undefined') { window.StopRecording = StopRecording; }
-if (typeof globalThis !== 'undefined') { globalThis.MixAudioStreams = MixAudioStreams; }
-if (typeof window !== 'undefined') { window.MixAudioStreams = MixAudioStreams; }
-if (typeof globalThis !== 'undefined') { globalThis.QuickFindBuddy = QuickFindBuddy; }
-if (typeof window !== 'undefined') { window.QuickFindBuddy = QuickFindBuddy; }
-if (typeof globalThis !== 'undefined') { globalThis.StartTransferSession = StartTransferSession; }
-if (typeof window !== 'undefined') { window.StartTransferSession = StartTransferSession; }
-if (typeof globalThis !== 'undefined') { globalThis.CancelTransferSession = CancelTransferSession; }
-if (typeof window !== 'undefined') { window.CancelTransferSession = CancelTransferSession; }
-if (typeof globalThis !== 'undefined') { globalThis.transferOnkeydown = transferOnkeydown; }
-if (typeof window !== 'undefined') { window.transferOnkeydown = transferOnkeydown; }
-if (typeof globalThis !== 'undefined') { globalThis.BlindTransfer = BlindTransfer; }
-if (typeof window !== 'undefined') { window.BlindTransfer = BlindTransfer; }
-if (typeof globalThis !== 'undefined') { globalThis.AttendedTransfer = AttendedTransfer; }
-if (typeof window !== 'undefined') { window.AttendedTransfer = AttendedTransfer; }
-if (typeof globalThis !== 'undefined') { globalThis.StartConferenceCall = StartConferenceCall; }
-if (typeof window !== 'undefined') { window.StartConferenceCall = StartConferenceCall; }
-if (typeof globalThis !== 'undefined') { globalThis.CancelConference = CancelConference; }
-if (typeof window !== 'undefined') { window.CancelConference = CancelConference; }
-if (typeof globalThis !== 'undefined') { globalThis.conferenceOnkeydown = conferenceOnkeydown; }
-if (typeof window !== 'undefined') { window.conferenceOnkeydown = conferenceOnkeydown; }
-if (typeof globalThis !== 'undefined') { globalThis.ConferenceDial = ConferenceDial; }
-if (typeof window !== 'undefined') { window.ConferenceDial = ConferenceDial; }
-if (typeof globalThis !== 'undefined') { globalThis.cancelSession = cancelSession; }
-if (typeof window !== 'undefined') { window.cancelSession = cancelSession; }
-if (typeof globalThis !== 'undefined') { globalThis.IsSessionActiveForUiAction = IsSessionActiveForUiAction; }
-if (typeof window !== 'undefined') { window.IsSessionActiveForUiAction = IsSessionActiveForUiAction; }
-if (typeof globalThis !== 'undefined') { globalThis.GuardLineAction = GuardLineAction; }
-if (typeof window !== 'undefined') { window.GuardLineAction = GuardLineAction; }
-if (typeof globalThis !== 'undefined') { globalThis.ApplyLocalHoldState = ApplyLocalHoldState; }
-if (typeof window !== 'undefined') { window.ApplyLocalHoldState = ApplyLocalHoldState; }
-if (typeof globalThis !== 'undefined') { globalThis.holdSession = holdSession; }
-if (typeof window !== 'undefined') { window.holdSession = holdSession; }
-if (typeof globalThis !== 'undefined') { globalThis.unholdSession = unholdSession; }
-if (typeof window !== 'undefined') { window.unholdSession = unholdSession; }
-if (typeof globalThis !== 'undefined') { globalThis.MuteSession = MuteSession; }
-if (typeof window !== 'undefined') { window.MuteSession = MuteSession; }
-if (typeof globalThis !== 'undefined') { globalThis.UnmuteSession = UnmuteSession; }
-if (typeof window !== 'undefined') { window.UnmuteSession = UnmuteSession; }
-if (typeof globalThis !== 'undefined') { globalThis.endSession = endSession; }
-if (typeof window !== 'undefined') { window.endSession = endSession; }
-if (typeof globalThis !== 'undefined') { globalThis.sendDTMF = sendDTMF; }
-if (typeof window !== 'undefined') { window.sendDTMF = sendDTMF; }
-if (typeof globalThis !== 'undefined') { globalThis.switchVideoSource = switchVideoSource; }
-if (typeof window !== 'undefined') { window.switchVideoSource = switchVideoSource; }
-if (typeof globalThis !== 'undefined') { globalThis.SendCanvas = SendCanvas; }
-if (typeof window !== 'undefined') { window.SendCanvas = SendCanvas; }
-if (typeof globalThis !== 'undefined') { globalThis.SendVideo = SendVideo; }
-if (typeof window !== 'undefined') { window.SendVideo = SendVideo; }
-if (typeof globalThis !== 'undefined') { globalThis.ShareScreen = ShareScreen; }
-if (typeof window !== 'undefined') { window.ShareScreen = ShareScreen; }
-if (typeof globalThis !== 'undefined') { globalThis.DisableVideoStream = DisableVideoStream; }
-if (typeof window !== 'undefined') { window.DisableVideoStream = DisableVideoStream; }
-if (typeof globalThis !== 'undefined') { globalThis.AppendNumpadDtmf = AppendNumpadDtmf; }
-if (typeof window !== 'undefined') { window.AppendNumpadDtmf = AppendNumpadDtmf; }
-if (typeof globalThis !== 'undefined') { globalThis.ClearNumpadDtmf = ClearNumpadDtmf; }
-if (typeof window !== 'undefined') { window.ClearNumpadDtmf = ClearNumpadDtmf; }
-if (typeof globalThis !== 'undefined') { globalThis.SendImmediateNumpadDtmf = SendImmediateNumpadDtmf; }
-if (typeof window !== 'undefined') { window.SendImmediateNumpadDtmf = SendImmediateNumpadDtmf; }
-if (typeof globalThis !== 'undefined') { globalThis.HandleNumpadKeydown = HandleNumpadKeydown; }
-if (typeof window !== 'undefined') { window.HandleNumpadKeydown = HandleNumpadKeydown; }
-if (typeof globalThis !== 'undefined') { globalThis.KeyPressNumpad = KeyPressNumpad; }
-if (typeof window !== 'undefined') { window.KeyPressNumpad = KeyPressNumpad; }
-if (typeof globalThis !== 'undefined') { globalThis.SendNumpadDtmf = SendNumpadDtmf; }
-if (typeof window !== 'undefined') { window.SendNumpadDtmf = SendNumpadDtmf; }
-
-
-// File: 15_ui_views.js
 function CloseNumpadInline(){
     if(!dtmfInlinePanelState) return;
     var actionArea = $("#actionArea");
@@ -9346,7 +8447,7 @@ function AddLineHtml(lineObj, direction){
 function RemoveLine(lineObj){
     if(lineObj == null) return;
 
-    var earlyReject = (lineObj.SipSession && lineObj.SipSession.data) ? lineObj.SipSession.data.earlyReject : false;
+    var earlyReject = lineObj.SipSession.data.earlyReject;
     for(var l = 0; l < Lines.length; l++) {
         if(Lines[l].LineNumber == lineObj.LineNumber) {
             Lines.splice(l,1);
@@ -9558,101 +8659,6 @@ var Buddy = function(type, identity, CallerIDName, ExtNo, MobileNumber, ContactN
     this.AllowAutoDelete = (typeof autoDelete !== 'undefined')? autoDelete : AutoDeleteDefault;
     this.Pinned = (typeof pinned !== 'undefined')? pinned : false;
 }
-
-// Global exports shim for backwards compatibility
-if (typeof globalThis !== 'undefined') { globalThis.CloseNumpadInline = CloseNumpadInline; }
-if (typeof window !== 'undefined') { window.CloseNumpadInline = CloseNumpadInline; }
-if (typeof globalThis !== 'undefined') { globalThis.BuildDialInputRowHtml = BuildDialInputRowHtml; }
-if (typeof window !== 'undefined') { window.BuildDialInputRowHtml = BuildDialInputRowHtml; }
-if (typeof globalThis !== 'undefined') { globalThis.BuildDialPadGridHtml = BuildDialPadGridHtml; }
-if (typeof window !== 'undefined') { window.BuildDialPadGridHtml = BuildDialPadGridHtml; }
-if (typeof globalThis !== 'undefined') { globalThis.ShowNumpad = ShowNumpad; }
-if (typeof window !== 'undefined') { window.ShowNumpad = ShowNumpad; }
-if (typeof globalThis !== 'undefined') { globalThis.ShowPresentMenu = ShowPresentMenu; }
-if (typeof window !== 'undefined') { window.ShowPresentMenu = ShowPresentMenu; }
-if (typeof globalThis !== 'undefined') { globalThis.RestoreCallControls = RestoreCallControls; }
-if (typeof window !== 'undefined') { window.RestoreCallControls = RestoreCallControls; }
-if (typeof globalThis !== 'undefined') { globalThis.ExpandVideoArea = ExpandVideoArea; }
-if (typeof window !== 'undefined') { window.ExpandVideoArea = ExpandVideoArea; }
-if (typeof globalThis !== 'undefined') { globalThis.RestoreVideoArea = RestoreVideoArea; }
-if (typeof window !== 'undefined') { window.RestoreVideoArea = RestoreVideoArea; }
-if (typeof globalThis !== 'undefined') { globalThis.Line = Line; }
-if (typeof window !== 'undefined') { window.Line = Line; }
-if (typeof globalThis !== 'undefined') { globalThis.ShowDial = ShowDial; }
-if (typeof window !== 'undefined') { window.ShowDial = ShowDial; }
-if (typeof globalThis !== 'undefined') { globalThis.SyncDialDeleteKey = SyncDialDeleteKey; }
-if (typeof window !== 'undefined') { window.SyncDialDeleteKey = SyncDialDeleteKey; }
-if (typeof globalThis !== 'undefined') { globalThis.handleDialInput = handleDialInput; }
-if (typeof window !== 'undefined') { window.handleDialInput = handleDialInput; }
-if (typeof globalThis !== 'undefined') { globalThis.dialOnkeydown = dialOnkeydown; }
-if (typeof window !== 'undefined') { window.dialOnkeydown = dialOnkeydown; }
-if (typeof globalThis !== 'undefined') { globalThis.KeyPress = KeyPress; }
-if (typeof window !== 'undefined') { window.KeyPress = KeyPress; }
-if (typeof globalThis !== 'undefined') { globalThis.CloseUpSettings = CloseUpSettings; }
-if (typeof window !== 'undefined') { window.CloseUpSettings = CloseUpSettings; }
-if (typeof globalThis !== 'undefined') { globalThis.ShowContacts = ShowContacts; }
-if (typeof window !== 'undefined') { window.ShowContacts = ShowContacts; }
-if (typeof globalThis !== 'undefined') { globalThis.RenderMobileTopBar = RenderMobileTopBar; }
-if (typeof window !== 'undefined') { window.RenderMobileTopBar = RenderMobileTopBar; }
-if (typeof globalThis !== 'undefined') { globalThis.HandleMobileClearTab = HandleMobileClearTab; }
-if (typeof window !== 'undefined') { window.HandleMobileClearTab = HandleMobileClearTab; }
-if (typeof globalThis !== 'undefined') { globalThis.ShowTab = ShowTab; }
-if (typeof window !== 'undefined') { window.ShowTab = ShowTab; }
-if (typeof globalThis !== 'undefined') { globalThis.RenderMainTabBar = RenderMainTabBar; }
-if (typeof window !== 'undefined') { window.RenderMainTabBar = RenderMainTabBar; }
-if (typeof globalThis !== 'undefined') { globalThis.RenderConfigActionBar = RenderConfigActionBar; }
-if (typeof window !== 'undefined') { window.RenderConfigActionBar = RenderConfigActionBar; }
-if (typeof globalThis !== 'undefined') { globalThis.ToggleRecentExpanded = ToggleRecentExpanded; }
-if (typeof window !== 'undefined') { window.ToggleRecentExpanded = ToggleRecentExpanded; }
-if (typeof globalThis !== 'undefined') { globalThis.ToggleContactExpanded = ToggleContactExpanded; }
-if (typeof window !== 'undefined') { window.ToggleContactExpanded = ToggleContactExpanded; }
-if (typeof globalThis !== 'undefined') { globalThis.GetRecentActionNumber = GetRecentActionNumber; }
-if (typeof window !== 'undefined') { window.GetRecentActionNumber = GetRecentActionNumber; }
-if (typeof globalThis !== 'undefined') { globalThis.BindContactExpandedActions = BindContactExpandedActions; }
-if (typeof window !== 'undefined') { window.BindContactExpandedActions = BindContactExpandedActions; }
-if (typeof globalThis !== 'undefined') { globalThis.GetRecentHistoryEntries = GetRecentHistoryEntries; }
-if (typeof window !== 'undefined') { window.GetRecentHistoryEntries = GetRecentHistoryEntries; }
-if (typeof globalThis !== 'undefined') { globalThis.BuildRecentHistoryList = BuildRecentHistoryList; }
-if (typeof window !== 'undefined') { window.BuildRecentHistoryList = BuildRecentHistoryList; }
-if (typeof globalThis !== 'undefined') { globalThis.ShowRecentHistoryList = ShowRecentHistoryList; }
-if (typeof window !== 'undefined') { window.ShowRecentHistoryList = ShowRecentHistoryList; }
-if (typeof globalThis !== 'undefined') { globalThis.BindRecentExpandedActions = BindRecentExpandedActions; }
-if (typeof window !== 'undefined') { window.BindRecentExpandedActions = BindRecentExpandedActions; }
-if (typeof globalThis !== 'undefined') { globalThis.ShowRecentsTab = ShowRecentsTab; }
-if (typeof window !== 'undefined') { window.ShowRecentsTab = ShowRecentsTab; }
-if (typeof globalThis !== 'undefined') { globalThis.AddContactFromHistory = AddContactFromHistory; }
-if (typeof window !== 'undefined') { window.AddContactFromHistory = AddContactFromHistory; }
-if (typeof globalThis !== 'undefined') { globalThis.DeleteRecentGroupFromHistory = DeleteRecentGroupFromHistory; }
-if (typeof window !== 'undefined') { window.DeleteRecentGroupFromHistory = DeleteRecentGroupFromHistory; }
-if (typeof globalThis !== 'undefined') { globalThis.ClearAllRecentHistory = ClearAllRecentHistory; }
-if (typeof window !== 'undefined') { window.ClearAllRecentHistory = ClearAllRecentHistory; }
-if (typeof globalThis !== 'undefined') { globalThis.ClearAllContacts = ClearAllContacts; }
-if (typeof window !== 'undefined') { window.ClearAllContacts = ClearAllContacts; }
-if (typeof globalThis !== 'undefined') { globalThis.ShowSortAnfFilter = ShowSortAnfFilter; }
-if (typeof window !== 'undefined') { window.ShowSortAnfFilter = ShowSortAnfFilter; }
-if (typeof globalThis !== 'undefined') { globalThis.html = html; }
-if (typeof window !== 'undefined') { window.html = html; }
-if (typeof globalThis !== 'undefined') { globalThis.DialByLine = DialByLine; }
-if (typeof window !== 'undefined') { window.DialByLine = DialByLine; }
-if (typeof globalThis !== 'undefined') { globalThis.SelectLine = SelectLine; }
-if (typeof window !== 'undefined') { window.SelectLine = SelectLine; }
-if (typeof globalThis !== 'undefined') { globalThis.FindLineByNumber = FindLineByNumber; }
-if (typeof window !== 'undefined') { window.FindLineByNumber = FindLineByNumber; }
-if (typeof globalThis !== 'undefined') { globalThis.AddLineHtml = AddLineHtml; }
-if (typeof window !== 'undefined') { window.AddLineHtml = AddLineHtml; }
-if (typeof globalThis !== 'undefined') { globalThis.RemoveLine = RemoveLine; }
-if (typeof window !== 'undefined') { window.RemoveLine = RemoveLine; }
-if (typeof globalThis !== 'undefined') { globalThis.CloseLine = CloseLine; }
-if (typeof window !== 'undefined') { window.CloseLine = CloseLine; }
-if (typeof globalThis !== 'undefined') { globalThis.SwitchLines = SwitchLines; }
-if (typeof window !== 'undefined') { window.SwitchLines = SwitchLines; }
-if (typeof globalThis !== 'undefined') { globalThis.RefreshLineActivity = RefreshLineActivity; }
-if (typeof window !== 'undefined') { window.RefreshLineActivity = RefreshLineActivity; }
-if (typeof globalThis !== 'undefined') { globalThis.Buddy = Buddy; }
-if (typeof window !== 'undefined') { window.Buddy = Buddy; }
-
-
-// File: 16_buddies_contacts.js
 function InitUserBuddies(){
     var template = { TotalRows:0, DataCollection:[] }
     localDB.setItem(profileUserID + "-Buddies", JSON.stringify(template));
@@ -10573,57 +9579,6 @@ function SearchStream(obj, buddy){
 function RefreshStream(buddyObj, filter) {
     return;
 }
-
-// Global exports shim for backwards compatibility
-if (typeof globalThis !== 'undefined') { globalThis.InitUserBuddies = InitUserBuddies; }
-if (typeof window !== 'undefined') { window.InitUserBuddies = InitUserBuddies; }
-if (typeof globalThis !== 'undefined') { globalThis.MakeBuddy = MakeBuddy; }
-if (typeof window !== 'undefined') { window.MakeBuddy = MakeBuddy; }
-if (typeof globalThis !== 'undefined') { globalThis.UpdateBuddyCallerID = UpdateBuddyCallerID; }
-if (typeof window !== 'undefined') { window.UpdateBuddyCallerID = UpdateBuddyCallerID; }
-if (typeof globalThis !== 'undefined') { globalThis.AddBuddy = AddBuddy; }
-if (typeof window !== 'undefined') { window.AddBuddy = AddBuddy; }
-if (typeof globalThis !== 'undefined') { globalThis.CleanupBuddies = CleanupBuddies; }
-if (typeof window !== 'undefined') { window.CleanupBuddies = CleanupBuddies; }
-if (typeof globalThis !== 'undefined') { globalThis.PopulateBuddyList = PopulateBuddyList; }
-if (typeof window !== 'undefined') { window.PopulateBuddyList = PopulateBuddyList; }
-if (typeof globalThis !== 'undefined') { globalThis.UpdateBuddyList = UpdateBuddyList; }
-if (typeof window !== 'undefined') { window.UpdateBuddyList = UpdateBuddyList; }
-if (typeof globalThis !== 'undefined') { globalThis.AddBuddyMessageStream = AddBuddyMessageStream; }
-if (typeof window !== 'undefined') { window.AddBuddyMessageStream = AddBuddyMessageStream; }
-if (typeof globalThis !== 'undefined') { globalThis.RemoveBuddyMessageStream = RemoveBuddyMessageStream; }
-if (typeof window !== 'undefined') { window.RemoveBuddyMessageStream = RemoveBuddyMessageStream; }
-if (typeof globalThis !== 'undefined') { globalThis.DeleteCallRecordings = DeleteCallRecordings; }
-if (typeof window !== 'undefined') { window.DeleteCallRecordings = DeleteCallRecordings; }
-if (typeof globalThis !== 'undefined') { globalThis.ToggleExtraButtons = ToggleExtraButtons; }
-if (typeof window !== 'undefined') { window.ToggleExtraButtons = ToggleExtraButtons; }
-if (typeof globalThis !== 'undefined') { globalThis.SortBuddies = SortBuddies; }
-if (typeof window !== 'undefined') { window.SortBuddies = SortBuddies; }
-if (typeof globalThis !== 'undefined') { globalThis.SelectBuddy = SelectBuddy; }
-if (typeof window !== 'undefined') { window.SelectBuddy = SelectBuddy; }
-if (typeof globalThis !== 'undefined') { globalThis.OpenBuddyFromContacts = OpenBuddyFromContacts; }
-if (typeof window !== 'undefined') { window.OpenBuddyFromContacts = OpenBuddyFromContacts; }
-if (typeof globalThis !== 'undefined') { globalThis.CloseBuddy = CloseBuddy; }
-if (typeof window !== 'undefined') { window.CloseBuddy = CloseBuddy; }
-if (typeof globalThis !== 'undefined') { globalThis.RemoveBuddy = RemoveBuddy; }
-if (typeof window !== 'undefined') { window.RemoveBuddy = RemoveBuddy; }
-if (typeof globalThis !== 'undefined') { globalThis.DoRemoveBuddy = DoRemoveBuddy; }
-if (typeof window !== 'undefined') { window.DoRemoveBuddy = DoRemoveBuddy; }
-if (typeof globalThis !== 'undefined') { globalThis.FindBuddyByDid = FindBuddyByDid; }
-if (typeof window !== 'undefined') { window.FindBuddyByDid = FindBuddyByDid; }
-if (typeof globalThis !== 'undefined') { globalThis.FindBuddyByNumber = FindBuddyByNumber; }
-if (typeof window !== 'undefined') { window.FindBuddyByNumber = FindBuddyByNumber; }
-if (typeof globalThis !== 'undefined') { globalThis.FindBuddyByIdentity = FindBuddyByIdentity; }
-if (typeof window !== 'undefined') { window.FindBuddyByIdentity = FindBuddyByIdentity; }
-if (typeof globalThis !== 'undefined') { globalThis.FindBuddyByObservedUser = FindBuddyByObservedUser; }
-if (typeof window !== 'undefined') { window.FindBuddyByObservedUser = FindBuddyByObservedUser; }
-if (typeof globalThis !== 'undefined') { globalThis.SearchStream = SearchStream; }
-if (typeof window !== 'undefined') { window.SearchStream = SearchStream; }
-if (typeof globalThis !== 'undefined') { globalThis.RefreshStream = RefreshStream; }
-if (typeof window !== 'undefined') { window.RefreshStream = RefreshStream; }
-
-
-// File: 17_stage_views.js
 function RedrawStage(lineNum, videoChanged){
     var  stage = $("#line-" + lineNum + "-VideoCall");
     var container = $("#line-" + lineNum + "-stage-container");
@@ -10843,19 +9798,6 @@ function UnPinVideo(lineNum, videoEl){
     videoEl.srcObject.isPinned = false;
     RedrawStage(lineNum, true);
 }
-
-// Global exports shim for backwards compatibility
-if (typeof globalThis !== 'undefined') { globalThis.RedrawStage = RedrawStage; }
-if (typeof window !== 'undefined') { window.RedrawStage = RedrawStage; }
-if (typeof globalThis !== 'undefined') { globalThis.StageArea = StageArea; }
-if (typeof window !== 'undefined') { window.StageArea = StageArea; }
-if (typeof globalThis !== 'undefined') { globalThis.PinVideo = PinVideo; }
-if (typeof window !== 'undefined') { window.PinVideo = PinVideo; }
-if (typeof globalThis !== 'undefined') { globalThis.UnPinVideo = UnPinVideo; }
-if (typeof window !== 'undefined') { window.UnPinVideo = UnPinVideo; }
-
-
-// File: 18_settings_view.js
 function PopulateSettingsDeviceOptions(deviceInfos, selectMicScr, selectAudioScr, selectRingDevice, selectVideoScr){
     var counts = { audioinput: 0, audiooutput: 0, videoinput: 0 };
     if(selectMicScr && selectMicScr.length) selectMicScr.empty();
@@ -10993,7 +9935,7 @@ function ShowMyProfile(){
         AudioVideoHtml += "</div>";
 
         AudioVideoHtml += "<div class=UiText>"+ lang.quality +":</div>";
-        AudioVideoHtml += "<div class=\"pill-nav pill-nav-quality\">";
+        AudioVideoHtml += "<div class=pill-nav>";
         AudioVideoHtml += "<input name=Settings_Quality id=r30 type=radio value=\"160\"><label class=radio_pill for=r30><i class=\"fa fa-video-camera\" style=\"transform: scale(0.4)\"></i> HQVGA</label>";
         AudioVideoHtml += "<input name=Settings_Quality id=r31 type=radio value=\"240\"><label class=radio_pill for=r31><i class=\"fa fa-video-camera\" style=\"transform: scale(0.6)\"></i> QVGA</label>";
         AudioVideoHtml += "<input name=Settings_Quality id=r32 type=radio value=\"480\"><label class=radio_pill for=r32><i class=\"fa fa-video-camera\" style=\"transform: scale(0.8)\"></i> VGA</label>";
@@ -11956,29 +10898,6 @@ function ChangeSettings(lineNum, obj){
     }
     PopupMenu(obj, menu);
 }
-
-// Global exports shim for backwards compatibility
-if (typeof globalThis !== 'undefined') { globalThis.PopulateSettingsDeviceOptions = PopulateSettingsDeviceOptions; }
-if (typeof window !== 'undefined') { window.PopulateSettingsDeviceOptions = PopulateSettingsDeviceOptions; }
-if (typeof globalThis !== 'undefined') { globalThis.ShowMyProfile = ShowMyProfile; }
-if (typeof window !== 'undefined') { window.ShowMyProfile = ShowMyProfile; }
-if (typeof globalThis !== 'undefined') { globalThis.RefreshRegistration = RefreshRegistration; }
-if (typeof window !== 'undefined') { window.RefreshRegistration = RefreshRegistration; }
-if (typeof globalThis !== 'undefined') { globalThis.ToggleHeading = ToggleHeading; }
-if (typeof window !== 'undefined') { window.ToggleHeading = ToggleHeading; }
-if (typeof globalThis !== 'undefined') { globalThis.ToggleAutoAnswer = ToggleAutoAnswer; }
-if (typeof window !== 'undefined') { window.ToggleAutoAnswer = ToggleAutoAnswer; }
-if (typeof globalThis !== 'undefined') { globalThis.ToggleDoNoDisturb = ToggleDoNoDisturb; }
-if (typeof window !== 'undefined') { window.ToggleDoNoDisturb = ToggleDoNoDisturb; }
-if (typeof globalThis !== 'undefined') { globalThis.ToggleCallWaiting = ToggleCallWaiting; }
-if (typeof window !== 'undefined') { window.ToggleCallWaiting = ToggleCallWaiting; }
-if (typeof globalThis !== 'undefined') { globalThis.ToggleRecordAllCalls = ToggleRecordAllCalls; }
-if (typeof window !== 'undefined') { window.ToggleRecordAllCalls = ToggleRecordAllCalls; }
-if (typeof globalThis !== 'undefined') { globalThis.ChangeSettings = ChangeSettings; }
-if (typeof window !== 'undefined') { window.ChangeSettings = ChangeSettings; }
-
-
-// File: 19_presenters.js
 function PresentCamera(lineNum){
     var lineObj = FindLineByNumber(lineNum);
     if(lineObj == null || lineObj.SipSession == null){
@@ -12112,21 +11031,6 @@ function PresentBlank(lineNum){
 
     DisableVideoStream(lineNum);
 }
-
-// Global exports shim for backwards compatibility
-if (typeof globalThis !== 'undefined') { globalThis.PresentCamera = PresentCamera; }
-if (typeof window !== 'undefined') { window.PresentCamera = PresentCamera; }
-if (typeof globalThis !== 'undefined') { globalThis.PresentScreen = PresentScreen; }
-if (typeof window !== 'undefined') { window.PresentScreen = PresentScreen; }
-if (typeof globalThis !== 'undefined') { globalThis.PresentScratchpad = PresentScratchpad; }
-if (typeof window !== 'undefined') { window.PresentScratchpad = PresentScratchpad; }
-if (typeof globalThis !== 'undefined') { globalThis.PresentVideo = PresentVideo; }
-if (typeof window !== 'undefined') { window.PresentVideo = PresentVideo; }
-if (typeof globalThis !== 'undefined') { globalThis.PresentBlank = PresentBlank; }
-if (typeof window !== 'undefined') { window.PresentBlank = PresentBlank; }
-
-
-// File: 20_canvas_helpers.js
 function RemoveScratchpad(lineNum){
     var scratchpad = GetCanvas("line-" + lineNum + "-scratchpad");
     if(scratchpad != null){
@@ -12446,57 +11350,6 @@ var allowDradAndDrop = function() {
     var div = document.createElement('div');
     return (('draggable' in div) || ('ondragstart' in div && 'ondrop' in div)) && 'FormData' in window && 'FileReader' in window;
 }
-
-// Global exports shim for backwards compatibility
-if (typeof globalThis !== 'undefined') { globalThis.RemoveScratchpad = RemoveScratchpad; }
-if (typeof window !== 'undefined') { window.RemoveScratchpad = RemoveScratchpad; }
-if (typeof globalThis !== 'undefined') { globalThis.getPicture = getPicture; }
-if (typeof window !== 'undefined') { window.getPicture = getPicture; }
-if (typeof globalThis !== 'undefined') { globalThis.GetCanvas = GetCanvas; }
-if (typeof window !== 'undefined') { window.GetCanvas = GetCanvas; }
-if (typeof globalThis !== 'undefined') { globalThis.RemoveCanvas = RemoveCanvas; }
-if (typeof window !== 'undefined') { window.RemoveCanvas = RemoveCanvas; }
-if (typeof globalThis !== 'undefined') { globalThis.ImageEditor_Select = ImageEditor_Select; }
-if (typeof window !== 'undefined') { window.ImageEditor_Select = ImageEditor_Select; }
-if (typeof globalThis !== 'undefined') { globalThis.ImageEditor_FreedrawPen = ImageEditor_FreedrawPen; }
-if (typeof window !== 'undefined') { window.ImageEditor_FreedrawPen = ImageEditor_FreedrawPen; }
-if (typeof globalThis !== 'undefined') { globalThis.ImageEditor_FreedrawPaint = ImageEditor_FreedrawPaint; }
-if (typeof window !== 'undefined') { window.ImageEditor_FreedrawPaint = ImageEditor_FreedrawPaint; }
-if (typeof globalThis !== 'undefined') { globalThis.ImageEditor_Pan = ImageEditor_Pan; }
-if (typeof window !== 'undefined') { window.ImageEditor_Pan = ImageEditor_Pan; }
-if (typeof globalThis !== 'undefined') { globalThis.ImageEditor_ResetZoom = ImageEditor_ResetZoom; }
-if (typeof window !== 'undefined') { window.ImageEditor_ResetZoom = ImageEditor_ResetZoom; }
-if (typeof globalThis !== 'undefined') { globalThis.ImageEditor_ZoomIn = ImageEditor_ZoomIn; }
-if (typeof window !== 'undefined') { window.ImageEditor_ZoomIn = ImageEditor_ZoomIn; }
-if (typeof globalThis !== 'undefined') { globalThis.ImageEditor_ZoomOut = ImageEditor_ZoomOut; }
-if (typeof window !== 'undefined') { window.ImageEditor_ZoomOut = ImageEditor_ZoomOut; }
-if (typeof globalThis !== 'undefined') { globalThis.ImageEditor_AddCircle = ImageEditor_AddCircle; }
-if (typeof window !== 'undefined') { window.ImageEditor_AddCircle = ImageEditor_AddCircle; }
-if (typeof globalThis !== 'undefined') { globalThis.ImageEditor_AddRectangle = ImageEditor_AddRectangle; }
-if (typeof window !== 'undefined') { window.ImageEditor_AddRectangle = ImageEditor_AddRectangle; }
-if (typeof globalThis !== 'undefined') { globalThis.ImageEditor_AddTriangle = ImageEditor_AddTriangle; }
-if (typeof window !== 'undefined') { window.ImageEditor_AddTriangle = ImageEditor_AddTriangle; }
-if (typeof globalThis !== 'undefined') { globalThis.ImageEditor_AddEmoji = ImageEditor_AddEmoji; }
-if (typeof window !== 'undefined') { window.ImageEditor_AddEmoji = ImageEditor_AddEmoji; }
-if (typeof globalThis !== 'undefined') { globalThis.ImageEditor_AddText = ImageEditor_AddText; }
-if (typeof window !== 'undefined') { window.ImageEditor_AddText = ImageEditor_AddText; }
-if (typeof globalThis !== 'undefined') { globalThis.ImageEditor_Clear = ImageEditor_Clear; }
-if (typeof window !== 'undefined') { window.ImageEditor_Clear = ImageEditor_Clear; }
-if (typeof globalThis !== 'undefined') { globalThis.ImageEditor_ClearAll = ImageEditor_ClearAll; }
-if (typeof window !== 'undefined') { window.ImageEditor_ClearAll = ImageEditor_ClearAll; }
-if (typeof globalThis !== 'undefined') { globalThis.ImageEditor_Cancel = ImageEditor_Cancel; }
-if (typeof window !== 'undefined') { window.ImageEditor_Cancel = ImageEditor_Cancel; }
-if (typeof globalThis !== 'undefined') { globalThis.ImageEditor_Send = ImageEditor_Send; }
-if (typeof window !== 'undefined') { window.ImageEditor_Send = ImageEditor_Send; }
-if (typeof globalThis !== 'undefined') { globalThis.FindSomething = FindSomething; }
-if (typeof window !== 'undefined') { window.FindSomething = FindSomething; }
-if (typeof globalThis !== 'undefined') { globalThis.TogglePinned = TogglePinned; }
-if (typeof window !== 'undefined') { window.TogglePinned = TogglePinned; }
-if (typeof globalThis !== 'undefined') { globalThis.allowDradAndDrop = allowDradAndDrop; }
-if (typeof window !== 'undefined') { window.allowDradAndDrop = allowDradAndDrop; }
-
-
-// File: 21_dialogs.js
 function preventDefault(e){
     e.preventDefault();
     e.stopPropagation();
@@ -12916,100 +11769,38 @@ function HidePopup(timeout){
         cleanupPopupState();
     }
 }
-
-// Global exports shim for backwards compatibility
-if (typeof globalThis !== 'undefined') { globalThis.preventDefault = preventDefault; }
-if (typeof window !== 'undefined') { window.preventDefault = preventDefault; }
-if (typeof globalThis !== 'undefined') { globalThis.OpenWindow = OpenWindow; }
-if (typeof window !== 'undefined') { window.OpenWindow = OpenWindow; }
-if (typeof globalThis !== 'undefined') { globalThis.CloseWindow = CloseWindow; }
-if (typeof window !== 'undefined') { window.CloseWindow = CloseWindow; }
-if (typeof globalThis !== 'undefined') { globalThis.Alert = Alert; }
-if (typeof window !== 'undefined') { window.Alert = Alert; }
-if (typeof globalThis !== 'undefined') { globalThis.Confirm = Confirm; }
-if (typeof window !== 'undefined') { window.Confirm = Confirm; }
-if (typeof globalThis !== 'undefined') { globalThis.Prompt = Prompt; }
-if (typeof window !== 'undefined') { window.Prompt = Prompt; }
-if (typeof globalThis !== 'undefined') { globalThis.PopupMenu = PopupMenu; }
-if (typeof window !== 'undefined') { window.PopupMenu = PopupMenu; }
-if (typeof globalThis !== 'undefined') { globalThis.HidePopup = HidePopup; }
-if (typeof window !== 'undefined') { window.HidePopup = HidePopup; }
-
-
-// File: 22_watchdogs.js
-var _detectDevicesPermissionRequested = false;
-
-function _applyDeviceList(deviceInfos) {
-    HasVideoDevice = false;
-    HasAudioDevice = false;
-    HasSpeakerDevice = false;
-    AudioinputDevices = [];
-    VideoinputDevices = [];
-    SpeakerDevices = [];
-    for (var i = 0; i < deviceInfos.length; ++i) {
-        if (deviceInfos[i].kind === "audioinput") {
-            HasAudioDevice = true;
-            AudioinputDevices.push(deviceInfos[i]);
-        }
-        else if (deviceInfos[i].kind === "audiooutput") {
-            HasSpeakerDevice = true;
-            SpeakerDevices.push(deviceInfos[i]);
-        }
-        else if (deviceInfos[i].kind === "videoinput") {
-            if(EnableVideoCalling == true){
-                HasVideoDevice = true;
-                VideoinputDevices.push(deviceInfos[i]);
-            }
-        }
-    }
-}
-
 function DetectDevices(){
-    if(!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
     navigator.mediaDevices.enumerateDevices().then(function(deviceInfos){
-        _applyDeviceList(deviceInfos);
-
-        // If all audioinput devices have empty labels, permission hasn't been granted yet.
-        // Request permission once via getUserMedia so the browser prompts the user.
-        var allLabelsEmpty = AudioinputDevices.length > 0 &&
-            AudioinputDevices.every(function(d){ return !d.label; });
-
-        if ((allLabelsEmpty || AudioinputDevices.length === 0) && !_detectDevicesPermissionRequested) {
-            _detectDevicesPermissionRequested = true;
-            navigator.mediaDevices.getUserMedia({ audio: true, video: false })
-                .then(function(stream){
-                    // Stop all tracks immediately - we only needed to trigger the permission prompt.
-                    stream.getTracks().forEach(function(t){ t.stop(); });
-                    // Re-enumerate now that permission is granted.
-                    return navigator.mediaDevices.enumerateDevices();
-                })
-                .then(function(newDeviceInfos){
-                    _applyDeviceList(newDeviceInfos);
-                    console.log("Microphone permission granted. HasAudioDevice:", HasAudioDevice,
-                        "Devices:", AudioinputDevices.length);
-                })
-                .catch(function(e){
-                    console.warn("Microphone permission request failed or denied:", e.name, e.message);
-                    _detectDevicesPermissionRequested = false; // allow retry later
-                });
+        HasVideoDevice = false;
+        HasAudioDevice = false;
+        HasSpeakerDevice = false;
+        AudioinputDevices = [];
+        VideoinputDevices = [];
+        SpeakerDevices = [];
+        for (var i = 0; i < deviceInfos.length; ++i) {
+            if (deviceInfos[i].kind === "audioinput") {
+                HasAudioDevice = true;
+                AudioinputDevices.push(deviceInfos[i]);
+            }
+            else if (deviceInfos[i].kind === "audiooutput") {
+                HasSpeakerDevice = true;
+                SpeakerDevices.push(deviceInfos[i]);
+            }
+            else if (deviceInfos[i].kind === "videoinput") {
+                if(EnableVideoCalling == true){
+                    HasVideoDevice = true;
+                    VideoinputDevices.push(deviceInfos[i]);
+                }
+            }
         }
     }).catch(function(e){
         console.error("Error enumerating devices", e);
     });
 }
-
 DetectDevices();
 window.setInterval(function(){
     DetectDevices();
 }, 10000);
-
-// Re-detect immediately whenever a media device is plugged/unplugged or permission changes.
-if(navigator.mediaDevices && navigator.mediaDevices.addEventListener){
-    navigator.mediaDevices.addEventListener("devicechange", function(){
-        _detectDevicesPermissionRequested = false; // allow re-request if needed
-        DetectDevices();
-    });
-}
 window.setInterval(function(){
     for(var i = 0; i < Lines.length; i++){
         var lineObj = Lines[i];
@@ -13028,57 +11819,5 @@ window.setInterval(function(){
 
 
 
-
-
-
-
-// Global exports shim for backwards compatibility
-if (typeof globalThis !== 'undefined') { globalThis.DetectDevices = DetectDevices; }
-if (typeof window !== 'undefined') { window.DetectDevices = DetectDevices; }
-
-
-// ============================================================================
-//                        GLOBAL EVENT LISTENERS (Run Last)
-// ============================================================================
-
-window.addEventListener("unhandledrejection", function(event){
-    try {
-        var reason = String((event && event.reason) ? event.reason : "");
-        if(reason.indexOf('FN_NOT_FOUND: "siteFrame.closeSiteFrame"') > -1 ||
-           reason.indexOf('FN_NOT_FOUND: "cardFrame.closeCardFrame"') > -1 ||
-           reason.indexOf('FN_NOT_FOUND: "passkey.closePasskeyConditionalList"') > -1 ||
-           reason.indexOf("isAutoSaveDisabled") > -1){
-            event.preventDefault();
-        }
-    } catch(e){}
-});
-
-window.addEventListener("message", function(event) {
-    if(!event.data) return;
-    if(event.data.action === "desktop-shortcut"){
-        HandleShortcutAction(event.data.data ? event.data.data.shortcutAction : null);
-        return;
-    }
-    if(event.data.action !== "makeCall" && event.data.action !== "clickToCall") return;
-
-    var data = event.data.data || {};
-    var numberToDial = data.numberToDial;
-    var callType = data.callType || 'audio';
-    var callerName = data.callerName || null;
-    var extraHeaders = data.extraHeaders || null;
-
-    if(!numberToDial || numberToDial.trim() === '') {
-        console.warn("makeCall: No number to dial");
-        return;
-    }
-
-    console.log("makeCall initiated for:", numberToDial, "Type:", callType);
-
-    try {
-        DialByLine(callType, null, numberToDial, callerName, extraHeaders);
-    } catch(e) {
-        console.error("makeCall failed:", e);
-    }
-});
 
 

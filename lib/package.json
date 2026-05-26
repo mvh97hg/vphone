@@ -10,7 +10,6 @@
     "react-native.js",
     "vphone-widget.js",
     "vphone.min.js",
-    "vphone-widget.min.js",
     "dist/",
     "src/",
     "LIBRARY_API.md",
@@ -27,7 +26,7 @@
     "./vphone": "./vphone.js",
     "./widget": "./vphone-widget.js",
     "./vphone.min": "./vphone.min.js",
-    "./widget.min": "./vphone-widget.min.js",
+    "./widget.min": "./vphone.min.js",
     "./core": {
       "types": "./dist/vphone-sdk.d.ts",
       "import": "./dist/vphone-sdk.mjs",
@@ -50,7 +49,7 @@
     "build:single": "node scripts/build-single-file.js",
     "build:all": "npm run build:sdk && npm run build:single",
     "build:release": "npm run build:sdk && npm run build:single",
-    "test": "node test/run-tests.cjs",
+    "test": "node ../Phone/bundle.js && node test/run-tests.cjs",
     "build:sdk": "node scripts/build-sdk.js"
   },
   "keywords": [
@@ -83,6 +82,7 @@
     "sip.js": "^0.20.0"
   },
   "devDependencies": {
+    "esbuild": "^0.28.0",
     "moment": "^2.24.0",
     "terser": "^5.46.1"
   },

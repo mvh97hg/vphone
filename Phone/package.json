@@ -1,0 +1,13 @@
+{
+  "name": "vphone-phone-ui",
+  "version": "1.0.0",
+  "private": true,
+  "description": "VPhone ES6 UI module",
+  "scripts": {
+    "build": "esbuild src/index.js --bundle --minify --outfile=phone.js",
+    "dev": "esbuild src/index.js --bundle --outfile=phone.js --watch"
+  },
+  "devDependencies": {
+    "esbuild": "^0.20.0"
+  }
+}

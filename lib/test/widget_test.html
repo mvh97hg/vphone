@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VPhone Widget Integration Test</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" type="text/css" href="https://dtd6jl0d42sve.cloudfront.net/lib/jquery/jquery-ui-1.13.2.min.css"/>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --bg-primary: #0b0f19;
+            --bg-secondary: #131a26;
+            --bg-tertiary: #1c2533;
+            --text-primary: #f3f4f6;
+            --text-secondary: #9ca3af;
+            --accent: #10b981;
+            --accent-hover: #059669;
+            --accent-glow: rgba(16, 185, 129, 0.15);
+            --danger: #ef4444;
+            --border-color: #263347;
+            --font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: var(--font-family);
+            line-height: 1.6;
+            padding: 2rem;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+        }
+
+        header {
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+
+        header h1 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 2.5rem;
+            font-weight: 700;
+            letter-spacing: -0.05em;
+            background: linear-gradient(135deg, #34d399 0%, #059669 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+        }
+
+        header p {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+        }
+
+        .main-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            width: 100%;
+            display: grid;
+            grid-template-columns: 1.2fr 1fr;
+            gap: 2rem;
+            flex-grow: 1;
+        }
+
+        @media (max-width: 900px) {
+            .main-container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 1.75rem;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .card-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.35rem;
+            font-weight: 600;
+            margin-bottom: 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            color: var(--text-primary);
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 0.75rem;
+        }
+
+        .card-title i {
+            color: var(--accent);
+        }
+
+        /* Form styling */
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        input, select {
+            width: 100%;
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            font-family: var(--font-family);
+            font-size: 0.95rem;
+            transition: all 0.2s ease;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+
+        /* Interactive buttons */
+        .btn-container {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 0.85rem 1.5rem;
+            border-radius: 8px;
+            font-family: var(--font-family);
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            border: none;
+        }
+
+        .btn-primary {
+            background-color: var(--accent);
+            color: #ffffff;
+            box-shadow: 0 4px 14px 0 rgba(16, 185, 129, 0.3);
+        }
+
+        .btn-primary:hover {
+            background-color: var(--accent-hover);
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background-color: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background-color: var(--border-color);
+            transform: translateY(-1px);
+        }
+
+        .btn-danger {
+            background-color: var(--danger);
+            color: #ffffff;
+            box-shadow: 0 4px 14px 0 rgba(239, 68, 68, 0.3);
+        }
+
+        .btn-danger:hover {
+            background-color: #dc2626;
+            transform: translateY(-1px);
+        }
+
+        /* Logger area */
+        .logger-container {
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+            height: 100%;
+        }
+
+        .log-box {
+            background-color: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1rem;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.85rem;
+            overflow-y: auto;
+            flex-grow: 1;
+            max-height: 400px;
+            min-height: 300px;
+            color: #a7f3d0;
+        }
+
+        .log-entry {
+            margin-bottom: 0.5rem;
+            border-bottom: 1px solid #1a2436;
+            padding-bottom: 0.25rem;
+            word-break: break-all;
+        }
+
+        .log-time {
+            color: var(--text-secondary);
+            margin-right: 0.5rem;
+        }
+
+        .log-status {
+            color: #60a5fa;
+            font-weight: bold;
+        }
+
+        .log-call {
+            color: #f472b6;
+            font-weight: bold;
+        }
+
+        .log-error {
+            color: var(--danger);
+            font-weight: bold;
+        }
+
+        /* Inline widget mount container */
+        #inline-phone-container {
+            width: 100%;
+            height: 450px;
+            border: 2px dashed var(--border-color);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-secondary);
+            background-color: rgba(19, 26, 38, 0.5);
+            margin-top: 1.5rem;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        #inline-phone-container.active {
+            border-style: solid;
+            border-color: var(--accent);
+            background-color: transparent;
+        }
+
+        /* Footer styling */
+        footer {
+            margin-top: 2rem;
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+        }
+
+        footer a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>VPhone Widget Integration Test</h1>
+        <p>Kiểm thử nhúng Widget thực tế sử dụng file build <code>vphone.min.js</code></p>
+    </header>
+
+    <main class="main-container">
+        <!-- Configuration Card -->
+        <div class="card">
+            <h2 class="card-title"><i class="fa-solid fa-gears"></i> Cấu hình kết nối SIP</h2>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="wssServer">WSS Server</label>
+                    <input type="text" id="wssServer" placeholder="e.g., pbx.example.com">
+                </div>
+                <div class="form-group">
+                    <label for="WebSocketPort">Port</label>
+                    <input type="number" id="WebSocketPort" placeholder="e.g., 7443" value="7443">
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="ServerPath">Server Path</label>
+                    <input type="text" id="ServerPath" placeholder="e.g., /ws" value="/ws">
+                </div>
+                <div class="form-group">
+                    <label for="SipDomain">SIP Domain</label>
+                    <input type="text" id="SipDomain" placeholder="e.g., pbx.example.com">
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="SipUsername">SIP Username / Extension</label>
+                    <input type="text" id="SipUsername" placeholder="e.g., 1001">
+                </div>
+                <div class="form-group">
+                    <label for="SipPassword">SIP Password</label>
+                    <input type="password" id="SipPassword" placeholder="Mật khẩu SIP">
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="Language">Ngôn ngữ UI</label>
+                    <select id="Language">
+                        <option value="vi">Tiếng Việt (vi)</option>
+                        <option value="en">English (en)</option>
+                        <option value="auto">Tự động (auto)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="floatingMode">Chế độ hiển thị</label>
+                    <select id="floatingMode">
+                        <option value="floating">Floating (Góc dưới phải)</option>
+                        <option value="inline">Inline Container</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="btn-container">
+                <button id="btnMount" class="btn btn-primary"><i class="fa-solid fa-plug"></i> Mount Widget</button>
+                <button id="btnUnmount" class="btn btn-danger" style="display: none;"><i class="fa-solid fa-power-off"></i> Unmount Widget</button>
+                <button id="btnSave" class="btn btn-secondary"><i class="fa-solid fa-floppy-disk"></i> Lưu cấu hình</button>
+            </div>
+            
+            <!-- Container for inline mode -->
+            <div id="inline-phone-container-wrapper" style="display: none; margin-top: 1rem;">
+                <label>Container nhúng trực tiếp (Inline Mode)</label>
+                <div id="inline-phone-container">
+                    Chờ mount widget...
+                </div>
+            </div>
+        </div>
+
+        <!-- Event Logger Card -->
+        <div class="card">
+            <h2 class="card-title"><i class="fa-solid fa-terminal"></i> Trình theo dõi sự kiện (Live Logger)</h2>
+            <div class="logger-container">
+                <div id="logBox" class="log-box">
+                    <div class="log-entry"><span class="log-time">[Hệ thống]</span> Trình theo dõi sự kiện đã sẵn sàng. Hãy bấm Mount Widget để bắt đầu.</div>
+                </div>
+                <div class="btn-container" style="margin-top: 1rem; flex-grow: 0;">
+                    <button id="btnClearLog" class="btn btn-secondary" style="font-size: 0.85rem; padding: 0.5rem 1rem;"><i class="fa-solid fa-trash-can"></i> Xóa lịch sử Log</button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <p>VPhone SIP Softphone &copy; 2026. Tích hợp và phát triển bởi Antigravity CLI.</p>
+    </footer>
+
+    <!-- Load the Minified VPhone Library -->
+    <script src="../vphone.min.js?v=2026.05.26-t3"></script>
+    
+    <script>
+        // Các elements
+        const wssServerInput = document.getElementById('wssServer');
+        const webSocketPortInput = document.getElementById('WebSocketPort');
+        const serverPathInput = document.getElementById('ServerPath');
+        const sipDomainInput = document.getElementById('SipDomain');
+        const sipUsernameInput = document.getElementById('SipUsername');
+        const sipPasswordInput = document.getElementById('SipPassword');
+        const languageSelect = document.getElementById('Language');
+        const floatingModeSelect = document.getElementById('floatingMode');
+        
+        const btnMount = document.getElementById('btnMount');
+        const btnUnmount = document.getElementById('btnUnmount');
+        const btnSave = document.getElementById('btnSave');
+        const btnClearLog = document.getElementById('btnClearLog');
+        
+        const logBox = document.getElementById('logBox');
+        const inlineWrapper = document.getElementById('inline-phone-container-wrapper');
+        const inlineContainer = document.getElementById('inline-phone-container');
+
+        let mountedPhoneInstance = null;
+
+        // Tải cấu hình đã lưu trong localStorage
+        function loadConfig() {
+            wssServerInput.value = localStorage.getItem('vphone_test_wssServer') || '';
+            webSocketPortInput.value = localStorage.getItem('vphone_test_WebSocketPort') || '7443';
+            serverPathInput.value = localStorage.getItem('vphone_test_ServerPath') || '/ws';
+            sipDomainInput.value = localStorage.getItem('vphone_test_SipDomain') || '';
+            sipUsernameInput.value = localStorage.getItem('vphone_test_SipUsername') || '';
+            sipPasswordInput.value = localStorage.getItem('vphone_test_SipPassword') || '';
+            languageSelect.value = localStorage.getItem('vphone_test_Language') || 'vi';
+            floatingModeSelect.value = localStorage.getItem('vphone_test_floatingMode') || 'floating';
+            
+            handleFloatingModeChange();
+        }
+
+        // Lưu cấu hình vào localStorage
+        function saveConfig() {
+            localStorage.setItem('vphone_test_wssServer', wssServerInput.value.trim());
+            localStorage.setItem('vphone_test_WebSocketPort', webSocketPortInput.value.trim());
+            localStorage.setItem('vphone_test_ServerPath', serverPathInput.value.trim());
+            localStorage.setItem('vphone_test_SipDomain', sipDomainInput.value.trim());
+            localStorage.setItem('vphone_test_SipUsername', sipUsernameInput.value.trim());
+            localStorage.setItem('vphone_test_SipPassword', sipPasswordInput.value.trim());
+            localStorage.setItem('vphone_test_Language', languageSelect.value);
+            localStorage.setItem('vphone_test_floatingMode', floatingModeSelect.value);
+            
+            addLog('Hệ thống', 'Đã lưu cấu hình kết nối SIP vào bộ nhớ trình duyệt.');
+        }
+
+        // Xử lý thay đổi chế độ hiển thị
+        function handleFloatingModeChange() {
+            if (floatingModeSelect.value === 'inline') {
+                inlineWrapper.style.display = 'block';
+            } else {
+                inlineWrapper.style.display = 'none';
+            }
+        }
+
+        floatingModeSelect.addEventListener('change', handleFloatingModeChange);
+
+        // Hàm ghi Log
+        function addLog(category, text, type = 'normal') {
+            const date = new Date();
+            const timeStr = `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}:${date.getSeconds().toString().padStart(2, '0')}.${date.getMilliseconds().toString().padStart(3, '0')}`;
+            
+            const logEntry = document.createElement('div');
+            logEntry.className = 'log-entry';
+            
+            let categorySpan = `<span class="log-time">[${timeStr}] [${category}]</span>`;
+            if (type === 'status') {
+                logEntry.innerHTML = `${categorySpan} <span class="log-status">${text}</span>`;
+            } else if (type === 'call') {
+                logEntry.innerHTML = `${categorySpan} <span class="log-call">${text}</span>`;
+            } else if (type === 'error') {
+                logEntry.innerHTML = `${categorySpan} <span class="log-error">${text}</span>`;
+            } else {
+                logEntry.innerHTML = `${categorySpan} <span>${text}</span>`;
+            }
+            
+            logBox.appendChild(logEntry);
+            logBox.scrollTop = logBox.scrollHeight;
+        }
+
+        // Khởi tạo/Mount Widget
+        function mountWidget() {
+            if (mountedPhoneInstance) {
+                addLog('Lỗi', 'Widget đang được mount rồi!', 'error');
+                return;
+            }
+
+            const isFloating = floatingModeSelect.value === 'floating';
+            
+            // Cấu hình mount
+            const mountOptions = {
+                floating: true,
+                width: '300px',
+                height: '500px',
+                title: 'VPhone Test',
+                showStatus: true,
+                config: {
+                    wssServer: wssServerInput.value.trim() || null,
+                    WebSocketPort: wssServerInput.value.trim() ? parseInt(webSocketPortInput.value.trim()) : null,
+                    ServerPath: serverPathInput.value.trim() || null,
+                    SipDomain: sipDomainInput.value.trim() || wssServerInput.value.trim() || null,
+                    SipUsername: sipUsernameInput.value.trim() || null,
+                    SipPassword: sipPasswordInput.value.trim() || null,
+                    Language: languageSelect.value,
+                    EnableVideoCalling: true,
+                    HideSettingsButton: false
+                },
+                // callback sự kiện đăng ký/status
+                onStatusChange: function(event) {
+                    addLog('Sự kiện Trạng thái', JSON.stringify(event), 'status');
+                },
+                // callback sự kiện cuộc gọi
+                onCallEvent: function(event) {
+                    addLog('Sự kiện Cuộc gọi', JSON.stringify(event), 'call');
+                }
+            };
+
+            if (!isFloating) {
+                // Inline mode
+                inlineContainer.innerHTML = '';
+                inlineContainer.className = 'active';
+                mountOptions.container = '#inline-phone-container';
+            }
+
+            addLog('Hệ thống', `Đang mount widget ở chế độ ${floatingModeSelect.value}...`);
+
+            try {
+                if (typeof Vphone === 'undefined' || typeof Vphone.mount !== 'function') {
+                    throw new Error('Thư viện VPhone (Vphone.mount) chưa được tải thành công. Vui lòng chạy build trước!');
+                }
+                
+                mountedPhoneInstance = Vphone.mount(mountOptions);
+                addLog('Hệ thống', 'Đã khởi tạo và mount widget thành công!', 'status');
+                
+                btnMount.style.display = 'none';
+                btnUnmount.style.display = 'block';
+            } catch (err) {
+                addLog('Lỗi Khởi tạo', err.message, 'error');
+                if (!isFloating) {
+                    inlineContainer.innerHTML = `<span style="color:var(--danger)">Lỗi: ${err.message}</span>`;
+                    inlineContainer.className = '';
+                }
+            }
+        }
+
+        // Hủy/Unmount Widget
+        function unmountWidget() {
+            if (!mountedPhoneInstance) {
+                addLog('Lỗi', 'Không có widget nào đang hoạt động để hủy.', 'error');
+                return;
+            }
+
+            addLog('Hệ thống', 'Đang unmount hủy widget...');
+            try {
+                if (typeof mountedPhoneInstance.destroy === 'function') {
+                    mountedPhoneInstance.destroy();
+                } else if (typeof mountedPhoneInstance.unmount === 'function') {
+                    mountedPhoneInstance.unmount();
+                } else {
+                    // Fallback xóa container
+                    if (floatingModeSelect.value === 'inline') {
+                        inlineContainer.innerHTML = 'Đã hủy widget.';
+                        inlineContainer.className = '';
+                    } else {
+                        // Tìm và xóa floating container
+                        const floatingNode = document.querySelector('.vphone-launcher-container, iframe');
+                        if (floatingNode) floatingNode.remove();
+                    }
+                }
+                
+                mountedPhoneInstance = null;
+                addLog('Hệ thống', 'Đã hủy widget thành công.', 'status');
+                
+                btnMount.style.display = 'block';
+                btnUnmount.style.display = 'none';
+            } catch (err) {
+                addLog('Lỗi Hủy', err.message, 'error');
+            }
+        }
+
+        // Sự kiện các nút
+        btnMount.addEventListener('click', () => {
+            saveConfig();
+            mountWidget();
+        });
+        
+        btnUnmount.addEventListener('click', unmountWidget);
+        btnSave.addEventListener('click', saveConfig);
+        btnClearLog.addEventListener('click', () => {
+            logBox.innerHTML = '<div class="log-entry"><span class="log-time">[Hệ thống]</span> Lịch sử log đã được làm sạch.</div>';
+        });
+
+        // Khởi động
+        loadConfig();
+    </script>
+</body>
+</html>

@@ -756,7 +756,7 @@ app.whenReady().then(() => {
     const assetRoot = getAssetRoot();
     return {
       appRoot: assetRoot,
-      vPhoneScript: path.join(assetRoot, "lib", "vphone-widget.min.js"),
+      vPhoneScript: path.join(assetRoot, "lib", "vphone.min.js"),
       userConfigPath: getUserConfigPath(),
     };
   });

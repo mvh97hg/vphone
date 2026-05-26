@@ -761,6 +761,19 @@ input[type=range]{
     vertical-align:  initial !important;
 }
 
+.pill-nav-quality {
+    display: flex !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+}
+.pill-nav-quality input[type=radio] + label {
+    flex: 1 !important;
+    text-align: center !important;
+    padding-left: 3px !important;
+    padding-right: 3px !important;
+    font-size: 11px !important;
+}
+
 .pill-nav button:disabled {
     cursor: default;
     color: #666666;
@@ -2420,6 +2433,12 @@ div[id$="-Conference"]{
     .pageContainer.phoneEmbedded.phoneFrame250 {
         border-radius: 0;
         box-shadow: none !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        height: 100% !important;
+        min-height: 0 !important;
+        max-height: 100% !important;
     }
     #BtnFreeDial, #BtnAddSomeone { display: none !important; }
     #leftContent {
