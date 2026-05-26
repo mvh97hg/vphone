@@ -1,6 +1,4 @@
-const appversion = "0.3.34";
-const sipjsversion = "0.20.0";
-const navUserAgent = window.navigator.userAgent;
+const appversion = "0.1.1";
 const instanceID = String(Date.now());
 const localDB = window.localStorage;
 
@@ -36,7 +34,7 @@ let VoiceMailSubscribe = (getDbItem("VoiceMailSubscribe", "0") == "1");
 let VoicemailDid = getDbItem("VoicemailDid", "");
 let SubscribeVoicemailExpires = parseInt(getDbItem("SubscribeVoicemailExpires", 300));
 let ContactUserName = getDbItem("ContactUserName", "");
-let userAgentStr = getDbItem("UserAgentStr", "VPhone "+ appversion +" (SIPJS - "+ sipjsversion +") "+ navUserAgent);
+let userAgentStr = getDbItem("UserAgentStr", "VPhone "+ appversion);
 let hostingPrefix = getDbItem("HostingPrefix", "");
 let AppIcon = getDbItem("AppIcon", "icons/phone.ico");
 let NotificationIcon = getDbItem("NotificationIcon", "");
