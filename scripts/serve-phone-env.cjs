@@ -57,13 +57,7 @@ const injectScript = `<script>window.__VPhoneEmbedConfig=${JSON.stringify(embedC
 const port = Number(process.env.VPHONE_TEST_PORT || 9011);
 const server = http.createServer((req, res) => {
   const reqPath = decodeURIComponent((req.url || "/").split("?")[0]);
-  if (reqPath === "/") {
-    res.statusCode = 302;
-    res.setHeader("Location", "/src/ui/index.html");
-    res.end("Redirecting to /src/ui/index.html");
-    return;
-  }
-  const normalizedRel = (reqPath === "/" ? "src/ui/index.html" : reqPath.replace(/^\/+/, ""));
+  const normalizedRel = (reqPath === "/" ? "/src/ui/index.html" : reqPath).replace(/^\/+/, "");
   const filePath = path.normalize(path.join(projectRoot, normalizedRel));
   if (!filePath.startsWith(projectRoot)) {
     res.statusCode = 403;

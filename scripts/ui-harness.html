@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>VPhone Src Harness</title>
+    <link rel="stylesheet" href="../src/ui/styles/phone-ui.css">
+  </head>
+  <body>
+    <div id="phone-root"></div>
+    <pre id="self-test-result" data-status="idle"></pre>
+    <script type="module">
+      import { PhoneCore, MediaManager } from "../src/core/phone-core.js";
+      import { createPhoneWidget } from "../src/ui/phone-widget.js";
+
+      class FakeSdk {
+        constructor() {
+          this.listeners = new Map();
+          this.core = {
+            isOnHold: false,
+            bindAudioElements: () => {},
+            emit: (eventName, payload) => this.emit(eventName, payload)
+          };
+          this.calls = [];
+          this.hangups = 0;
+          this.mutes = 0;
+          this.holds = 0;
+          this.resumes = 0;
+          this.muted = false;
+          this.dtmfs = [];
+          this.transfers = [];
+          this.conferences = [];
+          this.deviceSwitches = [];
+          this.registers = 0;
+          this.unregisters = 0;
+          this.answers = 0;
+        }
+
+        on(eventName, handler) {
+          if (!this.listeners.has(eventName)) this.listeners.set(eventName, new Set());
+          this.listeners.get(eventName).add(handler);
+          return () => this.off(eventName, handler);
+        }
+
+        off(eventName, handler) {
+          this.listeners.get(eventName)?.delete(handler);
+        }
+
+        emit(eventName, payload) {
+          for (const handler of this.listeners.get(eventName) || []) handler(payload);
+        }
+
+        async register() {
+          this.registers += 1;
+          this.emit("registration-changed", { online: true, user: "1001" });
+          return { online: true };
+        }
+
+        async unregister() {
+          this.unregisters += 1;
+          this.emit("registration-changed", { online: false });
+        }
+
+        async toggleRegistration() {
+          return this.register();
+        }
+
+        getRegistrationState() {
+          return { online: false };
+        }
+
+        async call(target, options = {}) {
+          this.calls.push({ target, options });
+          this.emit("outgoing-call", { target });
+        }
+
+        async answer() {
+          this.answers += 1;
+          this.emit("call-connected", { direction: "incoming" });
+        }
+
+        hangup() {
+          this.hangups += 1;
+          this.emit("call-ended");
+        }
+
+        mute() {
+          this.mutes += 1;
+          this.muted = !this.muted;
+          this.emit("mute-changed", { muted: this.muted });
+          return this.muted;
+        }
+
+        async hold() {
+          this.holds += 1;
+          this.core.isOnHold = true;
+          this.emit("hold-changed", { onHold: true });
+        }
+
+        async resume() {
+          this.resumes += 1;
+          this.core.isOnHold = false;
+          this.emit("hold-changed", { onHold: false });
+        }
+
+        async reconnect() {}
+
+        async transfer(target) {
+          this.transfers.push(target);
+        }
+
+        async conference(target) {
+          this.conferences.push(target);
+        }
+
+        async listDevices() {
+          return [
+            { kind: "audioinput", deviceId: "mic-1", label: "Mic 1" },
+            { kind: "videoinput", deviceId: "cam-1", label: "Camera 1" },
+            { kind: "audiooutput", deviceId: "speaker-1", label: "Speaker 1" }
+          ];
+        }
+
+        async switchDevice(kind, deviceId) {
+          this.deviceSwitches.push({ kind, deviceId });
+        }
+
+        async sendDTMF(digits) {
+          this.dtmfs.push(digits);
+        }
+      }
+
+      localStorage.clear();
+      const sdk = new FakeSdk();
+      const phone = createPhoneWidget({
+        root: document.getElementById("phone-root"),
+        config: { EnableVideoCalling: true, Language: "en" },
+        deps: { sdk }
+      });
+
+      async function flush() {
+        return new Promise((resolve) => setTimeout(resolve, 0));
+      }
+
+      async function runUiBindingTest() {
+        document.getElementById("tab-dialpad")?.click();
+        await flush();
+        const dialText = document.getElementById("dialText");
+        const btnFreeDial = document.getElementById("BtnFreeDial");
+        const btnDialAudio = document.getElementById("dialAudio");
+        const btnDialVideo = document.getElementById("dialVideo");
+        const btnDigit1 = document.querySelector("[data-dial-digit='1']");
+        const btnDelete = document.getElementById("dialDeleteKey");
+        if (!dialText || !btnFreeDial || !btnDialAudio || !btnDialVideo) {
+          return { pass: false, reason: "Missing expected dialpad controls in src/ui template" };
+        }
+        const dialActionsRowCount = document.querySelectorAll("#actionArea .dialActionsRow").length;
+        const hasExtraDialpadCallControls = !!document.querySelector(
+          "#actionArea [data-action='mute'], #actionArea [data-action='hold'], #actionArea [data-action='hangup'], #actionArea [data-action='transfer'], #actionArea [data-action='conference']"
+        );
+
+        dialText.value = "";
+        btnDigit1.click();
+        const afterDigit = dialText.value;
+        btnDelete.click();
+        const afterDelete = dialText.value;
+
+        dialText.value = "1002";
+        btnFreeDial.click();
+        await flush();
+        document.getElementById("tab-dialpad").click();
+        await flush();
+        document.getElementById("dialText").value = "1002";
+        document.getElementById("dialAudio").click();
+        await flush();
+        document.getElementById("tab-dialpad").click();
+        await flush();
+        document.getElementById("dialText").value = "1002";
+        document.getElementById("dialVideo").click();
+        await flush();
+        document.getElementById("tab-dialpad").click();
+        await flush();
+        dialText.value = "1002";
+        dialText.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", ctrlKey: true, bubbles: true, cancelable: true }));
+        await flush();
+        sdk.emit("call-connected", { direction: "outgoing" });
+        await flush();
+        const activeCallSurface = !!document.querySelector("#line-1-ActiveCall .CallControlContainer");
+        const originalPrompt = window.prompt;
+        const originalConfirm = window.confirm;
+        let promptCount = 0;
+        let confirmCount = 0;
+        window.confirm = () => {
+          confirmCount += 1;
+          throw new Error("Native confirm must not be used by widget actions");
+        };
+        window.prompt = (message) => {
+          promptCount += 1;
+          if (String(message).includes("Transfer")) return "1003";
+          if (String(message).includes("Conference")) return "1004";
+          if (String(message).includes("Select device")) return "m1";
+          if (String(message).includes("Contact name")) return "Alice";
+          if (String(message).includes("Contact number")) return "1005";
+          return "";
+        };
+        document.querySelector(".callMute").click();
+        await flush();
+        const unmuteVisible = getComputedStyle(document.querySelector("#line-1-btn-Unmute")).display !== "none";
+        document.querySelector(".callUnmute").click();
+        await flush();
+        document.querySelector(".callHold").click();
+        await flush();
+        const holdStatus = document.getElementById("regStatus").textContent;
+        const resumeVisible = getComputedStyle(document.querySelector("#line-1-btn-Unhold")).display !== "none";
+        document.querySelector(".callResume").click();
+        await flush();
+        const resumeStatus = document.getElementById("regStatus").textContent;
+        const unmutedStatus = document.getElementById("regStatus").textContent;
+        const mutedStatus = "Muted";
+        document.querySelector(".callTransfer").click();
+        await flush();
+        const transferPanelVisible = getComputedStyle(document.querySelector("#line-1-Transfer")).display !== "none";
+        document.querySelector("#line-1-txt-FindTransferBuddy").value = "1003";
+        document.querySelector(".callBlindTransfer").click();
+        await flush();
+        document.querySelector(".callCancelTransfer").click();
+        await flush();
+        document.querySelector(".callConference").click();
+        await flush();
+        const conferencePanelVisible = getComputedStyle(document.querySelector("#line-1-Conference")).display !== "none";
+        document.querySelector("#line-1-txt-FindConferenceBuddy").value = "1004";
+        document.querySelector(".callConferenceDial").click();
+        await flush();
+        document.querySelector(".callDtmf").click();
+        await flush();
+        const dtmfPanelVisible = getComputedStyle(document.querySelector("#line-1-Dtmf")).display !== "none";
+        document.querySelector("[data-dtmf-digit='5']").click();
+        await flush();
+        document.querySelector(".callDeviceSettings").click();
+        await flush();
+        const inCallDeviceMenu = document.querySelector("[data-role='incall-device-menu']");
+        const inCallDeviceMenuInsidePanel = !!inCallDeviceMenu?.closest("#Phone");
+        document.querySelector(".callPresentSrc").click();
+        await flush();
+        const presentMenu = document.querySelector("[data-role='present-source-menu']");
+        const presentMenuInsidePanel = !!presentMenu?.closest("#Phone");
+        presentMenu?.querySelector("[data-menu-action='present:canvas']")?.click();
+        await flush();
+        const scratchpadVisible = getComputedStyle(document.querySelector("#line-1-scratchpad-container")).display !== "none";
+        const noExpandButtons = !document.querySelector("#line-1-btn-expand, #line-1-btn-restore, .callExpand, .callRestore");
+        sdk.emit("call-ended");
+        await flush();
+        document.getElementById("tab-recents").click();
+        await flush();
+        const recentItemsAfterCall = document.querySelectorAll(".enterpriseRecentItem").length;
+        const recentDayDividerCount = document.querySelectorAll(".recentDayDivider").length;
+        const recentStatusText = document.querySelector(".recentStatusPill")?.textContent || "";
+        const recentBillsecVisible = /\d{2}:\d{2}:\d{2}/.test(document.querySelector(".recentCallSubMeta")?.textContent || "");
+        const recentHasExpandChevron = !!document.querySelector(".recentExpandChevron");
+        document.querySelector(".enterpriseRecentItem")?.click();
+        await flush();
+        const recentExpandedVisible = getComputedStyle(document.querySelector(".recentCallExpanded")).display !== "none";
+        const recentRowExpandedClass = document.querySelector(".enterpriseRecentItem")?.classList.contains("expanded") === true;
+        const promptCountBeforeMore = promptCount;
+        document.getElementById("tab-dialpad").click();
+        await flush();
+        await new Promise((resolve) => setTimeout(resolve, 60));
+        const toggleTitles = {
+          audio: document.getElementById("dialAudio")?.getAttribute("title") || "",
+          auto: document.getElementById("dialpad-toggle-auto")?.getAttribute("title") || "",
+          dnd: document.getElementById("dialpad-toggle-dnd")?.getAttribute("title") || "",
+          cw: document.getElementById("dialpad-toggle-cw")?.getAttribute("title") || "",
+          rec: document.getElementById("dialpad-toggle-rec")?.getAttribute("title") || ""
+        };
+        document.querySelector("[data-action='more']").click();
+        await flush();
+        const profileMenu = document.querySelector("[data-role='profile-menu']");
+        const profileMenuText = profileMenu?.textContent || "";
+        const menuHostInsidePanel = !!profileMenu?.closest("#Phone");
+        const profileMenuHasDuplicateLanguage = profileMenuText.includes("Language");
+        const profileMenuHasDuplicateRecord = profileMenuText.includes("Record All Calls");
+        const promptCountAfterMore = promptCount - promptCountBeforeMore;
+        profileMenu?.querySelector("[data-menu-action='settings']")?.click();
+        await flush();
+        const settingsPanel = !!document.querySelector(".configExtensionScreen #Audio_Video_Html");
+        const languageInSettings = !!document.querySelector("#Settings_Language");
+        const switchStatus = document.getElementById("regStatus").textContent;
+        document.getElementById("Config_Reset").click();
+        await flush();
+        const resetConfirm = document.querySelector(".panelConfirmOverlay");
+        const resetConfirmInsidePanel = !!resetConfirm?.closest("#Phone");
+        resetConfirm?.querySelector(".panelConfirmCancel")?.click();
+        await flush();
+        document.getElementById("Settings_Language").value = "vi";
+        document.getElementById("Config_Save").click();
+        await new Promise((resolve) => setTimeout(resolve, 60));
+        const returnedToDialpadAfterSettingsSave = !!document.querySelector("#actionArea .dialScreenMobile");
+        const localizedSaveStatus = document.getElementById("regStatus").textContent;
+        const localizedBottomLabels = {
+          dialpad: document.getElementById("tab-dialpad")?.getAttribute("data-label") || "",
+          recents: document.getElementById("tab-recents")?.getAttribute("data-label") || "",
+          contacts: document.getElementById("tab-contacts")?.getAttribute("data-label") || ""
+        };
+        document.querySelector("[data-action='more']").click();
+        await flush();
+        const localizedProfileMenuText = document.querySelector("[data-role='profile-menu']")?.textContent || "";
+        document.querySelector("[data-role='profile-menu']")?.remove();
+        await flush();
+        document.getElementById("tab-dialpad").click();
+        await flush();
+        document.querySelector("[data-action='more']").click();
+        await flush();
+        document.querySelector("[data-role='profile-menu'] [data-menu-action='configure']")?.click();
+        await flush();
+        const configPanel = !!document.querySelector(".configExtensionScreen #Configure_Extension_Html");
+        document.querySelector("#Configure_Account_SipUsername").value = "2001";
+        const registersBeforeConfigSave = sdk.registers;
+        const unregistersBeforeConfigSave = sdk.unregisters;
+        document.querySelector("#Config_Save").click();
+        await flush();
+        const configSaveWorked = localStorage.getItem("SipUsername") === "2001";
+        const returnedToDialpadAfterConfigSave = !!document.querySelector("#actionArea .dialScreenMobile");
+        const configSaveRegistered = sdk.registers === registersBeforeConfigSave + 1 && sdk.unregisters === unregistersBeforeConfigSave + 1;
+        document.querySelector("[data-action='more']").click();
+        await flush();
+        document.querySelector("[data-role='profile-menu'] [data-menu-action='configure']")?.click();
+        await flush();
+        document.querySelector("#Config_Clear").click();
+        await flush();
+        const clearConfigConfirm = document.querySelector(".panelConfirmOverlay");
+        const clearConfigConfirmInsidePanel = !!clearConfigConfirm?.closest("#Phone");
+        const configStillPresentBeforeConfirm = localStorage.getItem("SipUsername") === "2001";
+        clearConfigConfirm?.querySelector(".panelConfirmOk")?.click();
+        await flush();
+        const configClearedAfterConfirm = localStorage.getItem("SipUsername") === null;
+        const registersBeforeRefresh = sdk.registers;
+        const unregistersBeforeRefresh = sdk.unregisters;
+        document.getElementById("tab-dialpad").click();
+        await flush();
+        document.querySelector("[data-action='more']").click();
+        await flush();
+        document.querySelector("[data-role='profile-menu'] [data-menu-action='refresh']")?.click();
+        await flush();
+        const refreshStatus = document.getElementById("regStatus").textContent;
+        document.getElementById("tab-contacts").click();
+        await flush();
+        document.querySelector("[data-action='add-contact']").click();
+        await flush();
+        const addContactForm = !!document.querySelector(".contactFormPanel #AddSomeone_Name");
+        document.getElementById("AddSomeone_Name").value = "Alice";
+        document.getElementById("AddSomeone_Num1").value = "1005";
+        document.getElementById("AddSomeone_Save").click();
+        await flush();
+        const addedContact = Array.from(document.querySelectorAll("#myContacts .contactCompactName")).some((el) => el.textContent === "Alice");
+        const contactUsesLegacyCompactLayout = !!document.querySelector("#myContacts .enterpriseContactItem .contactCompactMain .contactCompactNumber");
+        document.querySelector("[data-action='clear-tab'][data-tab='contacts']").click();
+        await flush();
+        const contactClearConfirm = document.querySelector(".panelConfirmOverlay");
+        const contactClearConfirmInsidePanel = !!contactClearConfirm?.closest("#Phone");
+        const contactStillPresentBeforeConfirm = Array.from(document.querySelectorAll("#myContacts .contactCompactName")).some((el) => el.textContent === "Alice");
+        contactClearConfirm?.querySelector(".panelConfirmOk")?.click();
+        await flush();
+        const contactsCleared = document.getElementById("myContacts").textContent.includes("Không có liên hệ") || document.getElementById("myContacts").textContent.includes("No contacts");
+        window.prompt = originalPrompt;
+        window.confirm = originalConfirm;
+
+        const embeddedRoot = document.createElement("div");
+        embeddedRoot.id = "embedded-config-root";
+        document.body.appendChild(embeddedRoot);
+        const embeddedSdk = new FakeSdk();
+        localStorage.clear();
+        createPhoneWidget({
+          root: embeddedRoot,
+          deps: { sdk: embeddedSdk },
+          config: {
+            Language: "en",
+            DisableFreeDial: true,
+            HideRecordAllCallsButton: true,
+            EnableTransfer: false,
+            EnableConference: false,
+            wssServer: "pbx.example.test",
+            WebSocketPort: "7443",
+            ServerPath: "/ws",
+            SipDomain: "example.test",
+            SipUsername: "3001",
+            SipPassword: "secret",
+            profileName: "Embedded User"
+          }
+        });
+        await new Promise((resolve) => setTimeout(resolve, 60));
+        embeddedRoot.querySelector("#tab-dialpad")?.click();
+        await flush();
+        const embeddedFreeDialHidden = getComputedStyle(embeddedRoot.querySelector("#BtnFreeDial")).display === "none";
+        const embeddedRecordHidden = !embeddedRoot.querySelector("#dialpad-toggle-rec");
+        embeddedSdk.emit("call-connected", { direction: "outgoing" });
+        await flush();
+        const embeddedTransferHidden = !embeddedRoot.querySelector("#line-1-btn-Transfer");
+        const embeddedConferenceHidden = !embeddedRoot.querySelector("#line-1-btn-Conference");
+        const embeddedVideoInCallHidden = !embeddedRoot.querySelector("#line-1-btn-present-src");
+        embeddedRoot.querySelector("[data-action='more']")?.click();
+        await flush();
+        embeddedRoot.querySelector("[data-role='profile-menu'] [data-menu-action='configure']")?.click();
+        await flush();
+        const embeddedConfigFields = {
+          server: embeddedRoot.querySelector("#Configure_Account_wssServer")?.value || "",
+          port: embeddedRoot.querySelector("#Configure_Account_WebSocketPort")?.value || "",
+          path: embeddedRoot.querySelector("#Configure_Account_ServerPath")?.value || "",
+          domain: embeddedRoot.querySelector("#Configure_Account_SipDomain")?.value || "",
+          username: embeddedRoot.querySelector("#Configure_Account_SipUsername")?.value || "",
+          password: embeddedRoot.querySelector("#Configure_Account_SipPassword")?.value || "",
+          profileName: embeddedRoot.querySelector("#Configure_Account_profileName")?.value || ""
+        };
+
+        const lastCall = sdk.calls[sdk.calls.length - 1];
+        return {
+          pass:
+            dialActionsRowCount === 1 &&
+            hasExtraDialpadCallControls === false &&
+            sdk.calls.length === 3 &&
+            afterDigit === "1" &&
+            afterDelete === "" &&
+            !!lastCall?.options?.video &&
+            sdk.mutes === 2 &&
+            mutedStatus === "Muted" &&
+            sdk.holds >= 3 &&
+            sdk.resumes >= 3 &&
+            holdStatus === "On hold" &&
+            resumeStatus === "Resumed" &&
+            sdk.transfers[0] === "1003" &&
+            sdk.conferences[0] === "1004" &&
+            transferPanelVisible &&
+            conferencePanelVisible &&
+            dtmfPanelVisible &&
+            sdk.dtmfs[0] === "5" &&
+            !!inCallDeviceMenu &&
+            inCallDeviceMenuInsidePanel &&
+            !!presentMenu &&
+            presentMenuInsidePanel &&
+            scratchpadVisible &&
+            noExpandButtons &&
+            recentItemsAfterCall > 0 &&
+            recentDayDividerCount === 1 &&
+            recentStatusText === "Answered" &&
+            recentBillsecVisible &&
+            recentHasExpandChevron &&
+            recentExpandedVisible &&
+            recentRowExpandedClass &&
+            activeCallSurface &&
+            unmuteVisible &&
+            resumeVisible &&
+            !!profileMenu &&
+            profileMenuText.includes("Refresh Registration") &&
+            profileMenuText.includes("Configure Extension") &&
+            profileMenuText.includes("Settings") &&
+            !profileMenuHasDuplicateLanguage &&
+            !profileMenuHasDuplicateRecord &&
+            menuHostInsidePanel &&
+            promptCountAfterMore === 0 &&
+            confirmCount === 0 &&
+            toggleTitles.audio === "Audio Call" &&
+            toggleTitles.auto === "Auto Answer" &&
+            toggleTitles.dnd === "Do Not Disturb" &&
+            toggleTitles.cw === "Call Waiting" &&
+            toggleTitles.rec === "Record All Calls" &&
+            settingsPanel &&
+            languageInSettings &&
+            returnedToDialpadAfterSettingsSave &&
+            localizedBottomLabels.dialpad === "Bàn phím" &&
+            localizedBottomLabels.recents === "Gần đây" &&
+            localizedBottomLabels.contacts === "Danh bạ" &&
+            localizedProfileMenuText.includes("Làm mới đăng ký") &&
+            localizedProfileMenuText.includes("Cấu hình máy lẻ") &&
+            localizedProfileMenuText.includes("Cài đặt") &&
+            localizedSaveStatus.includes("Đã lưu") &&
+            resetConfirmInsidePanel &&
+            configPanel &&
+            configSaveWorked &&
+            returnedToDialpadAfterConfigSave &&
+            configSaveRegistered &&
+            clearConfigConfirmInsidePanel &&
+            configStillPresentBeforeConfirm &&
+            configClearedAfterConfirm &&
+            sdk.deviceSwitches.length === 0 &&
+            switchStatus === "Settings" &&
+            sdk.unregisters === unregistersBeforeRefresh + 1 &&
+            sdk.registers === registersBeforeRefresh + 1 &&
+            refreshStatus === "Registration refreshed" &&
+            addContactForm &&
+            addedContact &&
+            contactUsesLegacyCompactLayout &&
+            contactClearConfirmInsidePanel &&
+            contactStillPresentBeforeConfirm &&
+            contactsCleared &&
+            embeddedFreeDialHidden &&
+            embeddedRecordHidden &&
+            embeddedTransferHidden &&
+            embeddedConferenceHidden &&
+            embeddedVideoInCallHidden &&
+            embeddedConfigFields.server === "pbx.example.test" &&
+            embeddedConfigFields.port === "7443" &&
+            embeddedConfigFields.path === "/ws" &&
+            embeddedConfigFields.domain === "example.test" &&
+            embeddedConfigFields.username === "3001" &&
+            embeddedConfigFields.password === "secret" &&
+            embeddedConfigFields.profileName === "Embedded User",
+          dialActionsRowCount,
+          hasExtraDialpadCallControls,
+          callCount: sdk.calls.length,
+          afterDigit,
+          afterDelete,
+          activeCallSurface,
+          lastCall,
+          mutes: sdk.mutes,
+          mutedStatus,
+          unmutedStatus,
+          unmuteVisible,
+          holds: sdk.holds,
+          resumes: sdk.resumes,
+          holdStatus,
+          resumeStatus,
+          resumeVisible,
+          dtmfs: sdk.dtmfs,
+          transfers: sdk.transfers,
+          conferences: sdk.conferences,
+          transferPanelVisible,
+          conferencePanelVisible,
+          dtmfPanelVisible,
+          inCallDeviceMenuInsidePanel,
+          presentMenuInsidePanel,
+          scratchpadVisible,
+          noExpandButtons,
+          recentItemsAfterCall,
+          recentDayDividerCount,
+          recentStatusText,
+          recentBillsecVisible,
+          recentHasExpandChevron,
+          recentExpandedVisible,
+          recentRowExpandedClass,
+          profileMenuText,
+          profileMenuHasDuplicateLanguage,
+          profileMenuHasDuplicateRecord,
+          confirmCount,
+          toggleTitles,
+          returnedToDialpadAfterSettingsSave,
+          localizedBottomLabels,
+          localizedProfileMenuText,
+          localizedSaveStatus,
+          resetConfirmInsidePanel,
+          promptCountBeforeMore,
+          menuHostInsidePanel,
+          promptCountAfterMore,
+          settingsPanel,
+          languageInSettings,
+          configPanel,
+          configSaveWorked,
+          returnedToDialpadAfterConfigSave,
+          configSaveRegistered,
+          clearConfigConfirmInsidePanel,
+          configStillPresentBeforeConfirm,
+          configClearedAfterConfirm,
+          deviceSwitches: sdk.deviceSwitches,
+          switchStatus,
+          registers: sdk.registers,
+          unregisters: sdk.unregisters,
+          registersBeforeRefresh,
+          unregistersBeforeRefresh,
+          refreshStatus,
+          addContactForm,
+          addedContact,
+          contactUsesLegacyCompactLayout,
+          contactClearConfirmInsidePanel,
+          contactStillPresentBeforeConfirm,
+          contactsCleared,
+          embeddedFreeDialHidden,
+          embeddedRecordHidden,
+          embeddedTransferHidden,
+          embeddedConferenceHidden,
+          embeddedVideoInCallHidden,
+          embeddedConfigFields
+        };
+      }
+
+      async function runCoreBehaviorTest() {
+        const audioTrack = { enabled: true, stopped: false, stop() { this.stopped = true; } };
+        const stream = {
+          getAudioTracks: () => [audioTrack],
+          getVideoTracks: () => [],
+          getTracks: () => [audioTrack],
+          addTrack: () => {},
+          removeTrack: () => {}
+        };
+        class FakeMediaManager extends MediaManager {
+          async getLocalStream() {
+            this.localStream = stream;
+            this.emit("local-stream", stream);
+            return stream;
+          }
+        }
+        const core = new PhoneCore({}, { SIP: { SessionState: { Established: "established", Terminated: "terminated" } }, mediaManager: new FakeMediaManager({ mediaDevices: {} }) });
+        await core.media.getLocalStream();
+        const events = [];
+        core.on("mute-changed", (event) => events.push(event.muted));
+        const first = core.mute();
+        const afterFirst = audioTrack.enabled;
+        const second = core.mute();
+        const afterSecond = audioTrack.enabled;
+        return {
+          pass: first === true && second === false && afterFirst === false && afterSecond === true && JSON.stringify(events) === JSON.stringify([true, false]),
+          first,
+          second,
+          afterFirst,
+          afterSecond,
+          events
+        };
+      }
+
+      async function maybeAutorunSelfTest() {
+        const resultEl = document.getElementById("self-test-result");
+        const params = new URLSearchParams(window.location.search);
+        if (params.get("autorun") !== "1") return;
+        try {
+          const uiBindings = await runUiBindingTest();
+          const coreBehavior = await runCoreBehaviorTest();
+          resultEl.dataset.status = uiBindings.pass && coreBehavior.pass ? "pass" : "fail";
+          resultEl.textContent = JSON.stringify({ uiBindings, coreBehavior }, null, 2);
+        } catch (error) {
+          resultEl.dataset.status = "fail";
+          resultEl.textContent = JSON.stringify({ error: String(error?.message || error) }, null, 2);
+        }
+      }
+
+      window.__VPhoneHarness = { phone, sdk, runUiBindingTest, runCoreBehaviorTest };
+      maybeAutorunSelfTest();
+    </script>
+  </body>
+</html>

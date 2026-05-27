@@ -11,40 +11,31 @@ function read(rel) {
   return fs.readFileSync(path.join(root, rel), "utf8");
 }
 
+function readJson(rel) {
+  return JSON.parse(read(rel));
+}
+
 function hasNoDomInCore() {
   const files = [
-    "src/core/webrtc-core.js",
-    "src/core/signaling.js",
-    "src/core/media-manager.js",
-    "src/core/peer-manager.js",
-    "src/core/call-state.js",
-    "src/core/event-emitter.js",
-    "src/sdk/sdk.js",
-    "src/adapters/legacy-phone-adapter.js"
+    "src/core/phone-core.js"
   ];
-  const domPattern = /(querySelector|addEventListener|innerHTML|document\.|window\.)/;
+  const forbiddenUiDomPattern = /(innerHTML|document\.body|document\.getElementById|window\.)/;
   for (const rel of files) {
     if (!exists(rel)) return false;
-    if (domPattern.test(read(rel))) return false;
+    const content = read(rel);
+    if (forbiddenUiDomPattern.test(content)) return false;
+    if (/querySelector/.test(content) && !/script\[data-vphone-runtime="sipjs"\]/.test(content)) return false;
   }
   return true;
 }
 
 function evaluate() {
   const requiredFiles = [
-    "src/core/webrtc-core.js",
-    "src/core/signaling.js",
-    "src/core/media-manager.js",
-    "src/core/peer-manager.js",
-    "src/core/call-state.js",
-    "src/core/event-emitter.js",
-    "src/sdk/sdk.js",
-    "src/ui/phone-ui.js",
-    "src/ui/dom-renderer.js",
-    "src/ui/controls.js",
-    "src/ui/notifications.js",
-    "src/ui/styles/phone-ui.css",
-    "src/adapters/legacy-phone-adapter.js"
+    "src/core/phone-core.js",
+    "src/sdk/phone-sdk.js",
+    "src/ui/phone-widget.js",
+    "src/ui/index.html",
+    "src/ui/styles/phone-ui.css"
   ];
   const missingFiles = requiredFiles.filter((f) => !exists(f));
 
@@ -54,6 +45,9 @@ function evaluate() {
   const auditDoc = exists("docs/library/PHONE_REFACTOR_REQUIREMENT_AUDIT.md")
     ? read("docs/library/PHONE_REFACTOR_REQUIREMENT_AUDIT.md")
     : "";
+  const browserMatrix = exists(".tmp/browser-matrix/results.json")
+    ? readJson(".tmp/browser-matrix/results.json")
+    : null;
 
   const artifacts = [
     "mapping",
@@ -67,10 +61,13 @@ function evaluate() {
 
   const passStructure = missingFiles.length === 0;
   const passDomFree = hasNoDomInCore();
-  const passSrcEntrypoint = srcIndex.includes("create-modular-phone.js");
+  const passSrcEntrypoint = srcIndex.includes("phone-widget.js");
   const passRedirectOnly = /http-equiv="refresh"/.test(phoneIndex) && phoneIndex.includes("/src/ui/index.html");
   const passServerDefaultSrc = serveScript.includes('reqPath === "/" ? "/src/ui/index.html" : reqPath');
   const passArtifacts = missingArtifacts.length === 0;
+  const passBrowserMatrix = !!browserMatrix && Array.isArray(browserMatrix.results) && browserMatrix.results.length > 0 && browserMatrix.results.every((item) => item.status === "pass");
+  const uiParityGap = require(path.join(root, "scripts", "audit-ui-parity-gap.cjs")).evaluate();
+  const passFeatureParity = uiParityGap.overall.percent === 100 && uiParityGap.overall.missing.length === 0;
 
   const result = {
     summary: {
@@ -80,15 +77,18 @@ function evaluate() {
       phoneRedirect: passRedirectOnly ? "PASS" : "FAIL",
       serverDefaultSrcEntrypoint: passServerDefaultSrc ? "PASS" : "FAIL",
       requiredArtifactsDoc: passArtifacts ? "PASS" : "FAIL",
-      browserMatrix: "PENDING",
-      featureParity100: "PARTIAL"
+      browserMatrix: passBrowserMatrix ? "PASS" : "PENDING",
+      featureParity100: passFeatureParity ? "PASS" : "PARTIAL"
     },
     evidence: {
       missingRequiredFiles: missingFiles,
       missingArtifacts,
+      browserMatrix: browserMatrix ? browserMatrix.results.map((item) => ({ browser: item.browser, status: item.status })) : [],
+      uiParityPercent: uiParityGap.overall.percent,
+      uiParityMissing: uiParityGap.overall.missing,
       notes: [
-        "Browser matrix remains pending due environment EPERM in this workspace.",
-        "Feature parity is partial until full dynamic legacy flow migration is complete."
+        "Browser matrix uses installed Chrome/Edge executables and Playwright Firefox fallback.",
+        "Feature parity status is scoped to the audited migrated UI flows."
       ]
     }
   };

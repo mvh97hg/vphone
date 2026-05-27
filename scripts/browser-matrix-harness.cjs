@@ -9,7 +9,7 @@ const root = process.cwd();
 const outDir = path.join(root, ".tmp", "browser-matrix");
 fs.mkdirSync(outDir, { recursive: true });
 
-const baseUrl = process.env.HARNESS_URL || "http://127.0.0.1:9011/src/ui/harness.html";
+const baseUrl = process.env.HARNESS_URL || "http://127.0.0.1:9011/scripts/ui-harness.html";
 const iterations = Number(process.env.MATRIX_ITERATIONS || "10");
 
 const targets = [
@@ -47,16 +47,79 @@ const targets = [
   },
   {
     name: "firefox",
-    exec: "C:\\Program Files\\Mozilla Firefox\\firefox.exe",
-    args: (url) => [
-      "--headless",
-      "--dump-dom",
-      url
-    ]
+    playwright: "firefox"
   }
 ];
 
-function runTarget(target) {
+async function runPlaywrightTarget(target) {
+  let playwright;
+  const candidates = [
+    path.join(root, "desktop", "electron", "node_modules", "playwright"),
+    path.join(root, "node_modules", "playwright")
+  ];
+  for (const candidate of candidates) {
+    try {
+      if (fs.existsSync(candidate)) {
+        playwright = require(candidate);
+        break;
+      }
+    } catch {}
+  }
+  if (!playwright || !playwright[target.playwright]) {
+    return { browser: target.name, status: "missing", reason: "playwright browser launcher not found" };
+  }
+
+  const url = `${baseUrl}?autorun=1&iterations=${iterations}&cb=${target.name}-${Date.now()}`;
+  const start = Date.now();
+  const domFile = path.join(outDir, `${target.name}-dom.html`);
+  const errFile = path.join(outDir, `${target.name}-stderr.log`);
+  const logs = [];
+  let browser;
+  try {
+    browser = await playwright[target.playwright].launch({ headless: true });
+    const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+    page.on("console", (msg) => {
+      if (["error", "warning"].includes(msg.type())) logs.push(`${msg.type()}: ${msg.text()}`);
+    });
+    page.on("pageerror", (err) => logs.push(`pageerror: ${err.message}`));
+    await page.goto(url, { waitUntil: "networkidle" });
+    const status = await page.locator("#self-test-result").getAttribute("data-status");
+    const dom = await page.content();
+    fs.writeFileSync(domFile, dom || "", "utf8");
+    fs.writeFileSync(errFile, logs.join("\n"), "utf8");
+    return {
+      browser: target.name,
+      status: status === "pass" ? "pass" : status === "fail" ? "fail" : "inconclusive",
+      exitCode: 0,
+      signal: null,
+      spawnError: null,
+      durationMs: Date.now() - start,
+      domBytes: Buffer.byteLength(dom || "", "utf8"),
+      stderrBytes: Buffer.byteLength(logs.join("\n"), "utf8"),
+      domFile,
+      errFile
+    };
+  } catch (error) {
+    fs.writeFileSync(domFile, "", "utf8");
+    fs.writeFileSync(errFile, String(error && error.stack ? error.stack : error), "utf8");
+    return {
+      browser: target.name,
+      status: "fail",
+      exitCode: 1,
+      signal: null,
+      spawnError: { code: error && error.code ? error.code : "ERROR", message: String(error && error.message ? error.message : error) },
+      durationMs: Date.now() - start,
+      domBytes: 0,
+      stderrBytes: Buffer.byteLength(String(error && error.stack ? error.stack : error), "utf8"),
+      domFile,
+      errFile
+    };
+  } finally {
+    if (browser) await browser.close();
+  }
+}
+
+function runExecutableTarget(target) {
   const profileDir = path.join(outDir, `${target.name}-profile`);
   fs.mkdirSync(profileDir, { recursive: true });
   const url = `${baseUrl}?autorun=1&iterations=${iterations}&cb=${target.name}-${Date.now()}`;
@@ -103,8 +166,13 @@ function runTarget(target) {
   };
 }
 
-const results = targets.map(runTarget);
-const outJson = path.join(outDir, "results.json");
-fs.writeFileSync(outJson, JSON.stringify({ baseUrl, iterations, generatedAt: new Date().toISOString(), results }, null, 2));
+(async () => {
+  const results = [];
+  for (const target of targets) {
+    results.push(target.playwright ? await runPlaywrightTarget(target) : runExecutableTarget(target));
+  }
+  const outJson = path.join(outDir, "results.json");
+  fs.writeFileSync(outJson, JSON.stringify({ baseUrl, iterations, generatedAt: new Date().toISOString(), results }, null, 2));
 
-console.log(JSON.stringify({ outJson, results }, null, 2));
+  console.log(JSON.stringify({ outJson, results }, null, 2));
+})();

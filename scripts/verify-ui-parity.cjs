@@ -3,8 +3,7 @@ const path = require("node:path");
 
 const root = path.resolve(__dirname, "..");
 const phoneJsPath = path.join(root, "Phone", "phone.js");
-const rendererPath = path.join(root, "src", "ui", "dom-renderer.js");
-const controlsPath = path.join(root, "src", "ui", "controls.js");
+const widgetPath = path.join(root, "src", "ui", "phone-widget.js");
 
 function read(file) {
   return fs.readFileSync(file, "utf8");
@@ -45,19 +44,18 @@ function idsFrom(htmlLike) {
 
 function evaluate() {
   const phoneJs = read(phoneJsPath);
-  const rendererJs = read(rendererPath);
-  const controlsJs = read(controlsPath);
+  const widgetJs = read(widgetPath);
 
   const legacyHtml = extractLegacyInitUiHtml(phoneJs);
-  const template = extractRendererTemplate(rendererJs);
+  const template = extractRendererTemplate(widgetJs);
   const legacyIds = idsFrom(legacyHtml);
   const modernIds = idsFrom(template);
 
   const missingLegacyIds = [...legacyIds].filter((id) => !modernIds.has(id)).sort();
   const extraModernIds = [...modernIds].filter((id) => !legacyIds.has(id)).sort();
 
-  const hasBtnFreeDialIdBinding = /BtnFreeDial\s*:\s*handlers\.onCall/.test(controlsJs);
-  const hasActionCallBinding = /call:\s*handlers\.onCall/.test(controlsJs);
+  const hasBtnFreeDialIdBinding = /BtnFreeDial\s*:\s*handlers\.onCall/.test(widgetJs);
+  const hasActionCallBinding = /call:\s*handlers\.onCall/.test(widgetJs);
 
   const result = {
     ok: missingLegacyIds.length === 0 && !(hasBtnFreeDialIdBinding && hasActionCallBinding),
