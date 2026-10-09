@@ -39,7 +39,7 @@ function createDesktopConfig(env, accountIndex) {
   return {
     mount: {
       width: '250px',
-      height: '425px',
+      height: '457px',
       title: `VPhone Register Smoke ${accountIndex || 1}`,
       showStatus: false
     },
@@ -52,7 +52,7 @@ function createDesktopConfig(env, accountIndex) {
       SipPassword: env[`SIP_PASSWORD${suffix}`],
       SipPasswordType: env.SIP_PASSWORD_TYPE || 'plain',
       Language: env.LANGUAGE || 'vi',
-      HideSettingsButton: false,
+      SettingsButton: true,
       EnableVideoCalling: false,
       AutoAnswerPolicy: 'allow',
       DoNotDisturbPolicy: 'allow',
@@ -62,6 +62,7 @@ function createDesktopConfig(env, accountIndex) {
 }
 
 async function main() {
+  ensureDesktopRuntime();
   const env = readEnvFile(envPath);
   const desktopConfig = createDesktopConfig(env, 1);
   const tempConfigPath = path.join(os.tmpdir(), `vphone-electron-${Date.now()}.json`);
@@ -81,7 +82,7 @@ async function main() {
 
     const settingsDevices = await readSettingsDevices(frame);
 
-    await frame.evaluate(() => DialByLine('audio', '', '1235'));
+    await dialNumber(frame, targetNumber);
     const callStatus = await waitForCallProgress(frame, 15000);
 
     const diagnostics = await launched.page.evaluate(() => (
@@ -120,6 +121,16 @@ async function main() {
   }
 }
 
+function ensureDesktopRuntime() {
+  const result = spawnSync(process.execPath, [path.join(appDir, 'scripts', 'build-desktop.cjs')], {
+    cwd: appDir,
+    stdio: 'inherit'
+  });
+  if (result.status !== 0) {
+    throw new Error(`Failed to build desktop runtime, exit ${result.status}`);
+  }
+}
+
 async function launchDesktopWithConfig(tempConfigPath, userDataPath) {
   const app = await electron.launch({
     cwd: appDir,
@@ -152,13 +163,12 @@ async function launchDesktopWithConfig(tempConfigPath, userDataPath) {
     await dialog.dismiss().catch(() => {});
   });
 
-  await page.waitForSelector('#phone-panel iframe, #desktop-error:not([hidden])', { timeout: 30000 });
+  await page.waitForSelector('#phone-panel #Phone, #desktop-error:not([hidden])', { timeout: 30000 });
   const errorText = await page.locator('#desktop-error:not([hidden])').textContent().catch(() => '');
   if (errorText) throw new Error(`Desktop app error: ${errorText}`);
 
-  const iframeElement = await page.waitForSelector('#phone-panel iframe', { timeout: 30000 });
-  const frame = await iframeElement.contentFrame();
-  await frame.waitForSelector('#regStatus, #mobileRegText', { state: 'attached', timeout: 30000 });
+  await page.waitForSelector('#phone-panel #regStatus, #phone-panel #mobileRegText', { state: 'attached', timeout: 30000 });
+  const frame = page;
 
   return { app, page, frame, consoleErrors, dialogs, failedRequests, consoleMessages };
 }
@@ -197,7 +207,7 @@ async function runDualExtensionSmoke(env) {
     }
 
     await setFeatureToggle(receiver.frame, 'dnd', true);
-    await caller.frame.evaluate((number) => DialByLine('audio', '', number), env.SIP_USERNAME);
+    await dialNumber(caller.frame, env.SIP_USERNAME);
     const dndResult = await waitForSipConsole(caller, 'SIP/2.0 486', 15000);
     const receiverDndResult = await waitForSipConsole(receiver, 'SIP/2.0 486', 5000);
     const dndCallStatus = await waitForCallProgress(caller.frame, 15000);
@@ -205,7 +215,7 @@ async function runDualExtensionSmoke(env) {
     await setFeatureToggle(receiver.frame, 'dnd', false);
 
     await setFeatureToggle(receiver.frame, 'auto', true);
-    await caller.frame.evaluate((number) => DialByLine('audio', '', number), env.SIP_USERNAME);
+    await dialNumber(caller.frame, env.SIP_USERNAME);
     const receiverCallStatus = await waitForCallProgress(receiver.frame, 20000);
     const callerCallStatus = await waitForCallProgress(caller.frame, 20000);
     const dndStatusLine = summarizeSipStatusLine(dndResult.message);
@@ -293,7 +303,7 @@ async function waitForRegistration(frame, timeoutMs) {
   while (Date.now() - started < timeoutMs) {
     const status = await readPhoneStatus(frame);
     if (status.isRegistered) return true;
-    await frame.page().waitForTimeout(1000);
+    await waitOnSurface(frame, 1000);
   }
   return false;
 }
@@ -302,7 +312,9 @@ async function readPhoneStatus(frame) {
   return frame.evaluate(() => ({
     regStatus: document.querySelector('#regStatus') ? document.querySelector('#regStatus').textContent.trim() : '',
     mobileRegText: document.querySelector('#mobileRegText') ? document.querySelector('#mobileRegText').textContent.trim() : '',
-    isRegistered: typeof IsSipRegistered === 'function' ? IsSipRegistered() : false,
+    isRegistered: typeof IsSipRegistered === 'function'
+      ? IsSipRegistered()
+      : !!(window.__VPhoneDesktopWidget && window.__VPhoneDesktopWidget.sdk && window.__VPhoneDesktopWidget.sdk.getRegistrationState().online),
     hasUserAgent: typeof userAgent !== 'undefined' && !!userAgent,
     hasRegisterer: typeof userAgent !== 'undefined' && !!userAgent && !!userAgent.registerer,
     microphoneOptions: document.querySelectorAll('#microphoneSrc option').length,
@@ -312,9 +324,13 @@ async function readPhoneStatus(frame) {
 
 async function readSettingsDevices(frame) {
   await frame.evaluate(() => {
-    if (typeof ShowMyProfile === 'function') ShowMyProfile();
+    if (typeof ShowMyProfile === 'function') {
+      ShowMyProfile();
+      return;
+    }
+    document.querySelector('[data-menu-action="settings"], #BtnSettings, .profileSettingsButton')?.click();
   });
-  await frame.waitForSelector('#microphoneSrc, #playbackSrc', { state: 'attached', timeout: 10000 });
+  await frame.waitForSelector('#microphoneSrc, #playbackSrc, #phone-panel #Phone', { state: 'attached', timeout: 10000 });
 
   const started = Date.now();
   let devices = null;
@@ -327,7 +343,7 @@ async function readSettingsDevices(frame) {
       hasSpeakerSelect: !!document.querySelector('#playbackSrc')
     }));
     if (devices.microphoneOptions > 0 && devices.speakerOptions > 0) return devices;
-    await frame.page().waitForTimeout(500);
+    await waitOnSurface(frame, 500);
   }
 
   return devices || {
@@ -344,6 +360,13 @@ async function setFeatureToggle(frame, featureName, enabled) {
     if (featureName === 'auto') {
       if (typeof AutoAnswerEnabled !== 'undefined' && AutoAnswerEnabled !== enabled && typeof ToggleAutoAnswer === 'function') {
         ToggleAutoAnswer();
+        return;
+      }
+      const btn = document.querySelector('#dialpad-toggle-auto');
+      const isOn = btn && btn.classList.contains('toggleOn');
+      if (btn && isOn !== enabled) btn.click();
+      if (window.__VPhoneDesktopWidget && window.__VPhoneDesktopWidget.ui) {
+        window.__VPhoneDesktopWidget.ui.dialpadToggles.auto = !!enabled;
       }
       return;
     }
@@ -351,6 +374,13 @@ async function setFeatureToggle(frame, featureName, enabled) {
     if (featureName === 'dnd') {
       if (typeof DoNotDisturbEnabled !== 'undefined' && DoNotDisturbEnabled !== enabled && typeof ToggleDoNoDisturb === 'function') {
         ToggleDoNoDisturb();
+        return;
+      }
+      const btn = document.querySelector('#dialpad-toggle-dnd');
+      const isOn = btn && btn.classList.contains('toggleOn');
+      if (btn && isOn !== enabled) btn.click();
+      if (window.__VPhoneDesktopWidget && window.__VPhoneDesktopWidget.ui) {
+        window.__VPhoneDesktopWidget.ui.dialpadToggles.dnd = !!enabled;
       }
     }
   }, { featureName, enabled });
@@ -372,13 +402,29 @@ async function waitForCallProgress(frame, timeoutMs) {
   while (Date.now() - started < timeoutMs) {
     lastStatus = await readCallStatus(frame);
     if (lastStatus.connected || lastStatus.ended) return lastStatus;
-    await frame.page().waitForTimeout(500);
+    await waitOnSurface(frame, 500);
   }
   return lastStatus || { activeCount: 0, connected: false, ended: false, states: [] };
 }
 
 async function readCallStatus(frame) {
   return frame.evaluate(() => {
+    if (window.__VPhoneDesktopWidget && window.__VPhoneDesktopWidget.ui) {
+      const ui = window.__VPhoneDesktopWidget.ui;
+      const activeCall = !!document.querySelector('#line-1-ActiveCall');
+      const progressCall = !!document.querySelector('#line-1-progress');
+      return {
+        activeCount: ui.activeCall ? 1 : 0,
+        connected: !!ui.callConnected || activeCall,
+        ended: !ui.activeCall && !progressCall && !activeCall,
+        states: [{
+          lineNumber: 1,
+          state: ui.callConnected || activeCall ? 'Established' : (progressCall ? 'Progress' : ''),
+          reasonCode: null,
+          reasonText: ''
+        }]
+      };
+    }
     const states = (typeof Lines !== 'undefined' ? Lines : []).map((line) => {
       const session = line && line.SipSession;
       return {
@@ -399,12 +445,49 @@ async function readCallStatus(frame) {
 
 async function hangupActiveCalls(frame) {
   await frame.evaluate(() => {
+    if (window.__VPhoneDesktopWidget && window.__VPhoneDesktopWidget.sdk) {
+      window.__VPhoneDesktopWidget.sdk.hangup();
+      return;
+    }
     if (typeof Lines === 'undefined' || typeof endSession !== 'function') return;
     Lines.forEach((line) => {
       if (line && line.SipSession) endSession(line.LineNumber);
     });
   }).catch(() => {});
-  await frame.page().waitForTimeout(1000).catch(() => {});
+  await waitOnSurface(frame, 1000).catch(() => {});
+}
+
+async function dialNumber(frame, number) {
+  await frame.evaluate((targetNumber) => {
+    if (typeof DialByLine === 'function') {
+      DialByLine('audio', '', targetNumber);
+      return;
+    }
+    const dialText = document.querySelector('#dialText');
+    if (dialText) {
+      dialText.value = targetNumber;
+      dialText.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    const dialAudio = document.querySelector('#dialAudio');
+    if (dialAudio) {
+      dialAudio.click();
+      return;
+    }
+    if (window.__VPhoneDesktopWidget && window.__VPhoneDesktopWidget.ui) {
+      window.__VPhoneDesktopWidget.ui.call({ video: false });
+    }
+  }, number);
+}
+
+function surfacePage(surface) {
+  return surface && typeof surface.page === 'function' ? surface.page() : surface;
+}
+
+async function waitOnSurface(surface, timeoutMs) {
+  const page = surfacePage(surface);
+  if (page && typeof page.waitForTimeout === 'function') {
+    await page.waitForTimeout(timeoutMs);
+  }
 }
 
 async function closeElectronApp(app) {

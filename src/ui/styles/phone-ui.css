@@ -211,6 +211,172 @@ body.phoneEmbeddedApp {
     background: #ffffff;
     padding: 7px 10px;
 }
+.vphoneToastHost {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 64px;
+    z-index: 60;
+    display: flex;
+    justify-content: center;
+    pointer-events: none;
+    padding: 0 12px;
+    box-sizing: border-box;
+}
+.vphoneToast {
+    max-width: 100%;
+    padding: 8px 12px;
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.92);
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.3;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.22);
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 180ms ease, transform 180ms ease;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.vphoneToast.isVisible {
+    opacity: 1;
+    transform: translateY(0);
+}
+.vphoneToast.isSuccess {
+    background: rgba(22, 101, 52, 0.94);
+}
+.vphoneToast.isError {
+    background: rgba(153, 27, 27, 0.94);
+}
+.vphoneContactSheet {
+    position: absolute;
+    inset: 0;
+    z-index: 40;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+}
+.vphoneContactSheetBackdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.2);
+}
+.vphoneContactSheetPanel {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    height: 100%;
+    max-height: 100%;
+    display: flex;
+    flex-direction: column;
+    background: #ffffff;
+    border-radius: 0;
+    box-shadow: none;
+    box-sizing: border-box;
+    padding-bottom: 8px;
+    overflow: hidden;
+}
+.vphoneContactSheetHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    flex: 0 0 auto;
+    padding: 10px 12px 8px;
+    border-bottom: 1px solid #eef2f7;
+}
+.vphoneContactSheetTitle {
+    flex: 1;
+    text-align: center;
+    font-size: 14px;
+    font-weight: 700;
+    color: #0f2744;
+}
+.vphoneContactSheetClose,
+.vphoneContactSheetHeaderSpacer {
+    width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+.vphoneContactSheetClose {
+    border: 0;
+    border-radius: 999px;
+    background: #f1f5f9;
+    color: #475569;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 0;
+}
+.vphoneContactSheetBody {
+    padding: 10px 12px 6px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+.vphoneContactField {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.vphoneContactLabel {
+    font-size: 12px;
+    font-weight: 600;
+    color: #475569;
+}
+.vphoneContactInput {
+    width: 100%;
+    min-height: 36px;
+    height: 36px;
+    border: 1px solid #d7deea;
+    border-radius: 10px;
+    background: #ffffff;
+    padding: 6px 10px;
+    font-size: 14px;
+    color: #0f172a;
+    box-sizing: border-box;
+    outline: none;
+}
+.vphoneContactInput:focus {
+    border-color: #93c5fd;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+.vphoneContactCheck {
+    display: flex;
+    align-items: flex-start;
+    gap: 4px;
+    font-size: 12px;
+    line-height: 1.35;
+    color: #334155;
+    cursor: pointer;
+}
+.vphoneContactCheck label {
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: unset !important;
+    line-height: 1.35;
+}
+.vphoneContactSheetActions {
+    display: flex;
+    gap: 8px;
+    flex: 0 0 auto;
+    margin-top: auto;
+    padding: 8px 12px 10px;
+}
+.vphoneContactSheetActions button {
+    flex: 1;
+    height: 36px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 700;
+}
 .UiSideField{
     padding-top:0px;
     padding-bottom:0px;
@@ -1850,22 +2016,27 @@ input[type=range]{
     border-radius: 100px;
     width:55px;
     height:55px;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    line-height: 1;
 }
 .dialButtons:disabled:hover{
     border: none;
 }
 .dialButtons div{
     font-size: 24px;
-    line-height: 9px;
-    margin: 0px;
-    margin-top: 7px;
-    padding: 0px;
+    line-height: 1;
+    margin: 0;
+    padding: 0;
 }
 .dialButtons span{
     font-size: 9px;
-    line-height: 9px;
-    margin: 0px;
-    padding: 0px;
+    line-height: 1;
+    margin: 1px 0 0;
+    padding: 0;
 }
 .dialButtonsDial{
     font-size: 25px;
@@ -2030,7 +2201,7 @@ input[type=range]{
     color: #ffffff;
 }
 
-/* Keep transfer/conference workspace above call controls so inputs/buttons stay clickable. */
+/* Legacy transfer/conference float above call controls (standalone shell). */
 div[id$="-Transfer"],
 div[id$="-Conference"]{
     position: absolute;
@@ -2040,6 +2211,22 @@ div[id$="-Conference"]{
     z-index: 140;
     padding: 0 10px 230px 10px;
     box-sizing: border-box;
+}
+/* In-call embed: overlays participate in flex flow — never absolute-clip the keypad. */
+.pageContainer.phoneFrame250 div[id$="-Transfer"],
+.pageContainer.phoneFrame250 div[id$="-Conference"],
+.pageContainer.phoneFrame250 div[id$="-Dtmf"],
+.pageContainer.phoneFrame250 .vphoneDtmfCard {
+    position: relative !important;
+    left: auto !important;
+    right: auto !important;
+    top: auto !important;
+    bottom: auto !important;
+    z-index: 2;
+}
+.pageContainer.phoneFrame250 div[id$="-Transfer"],
+.pageContainer.phoneFrame250 div[id$="-Conference"] {
+    padding: 0 !important;
 }
 
 .transferPopupPanel {
@@ -2052,14 +2239,14 @@ div[id$="-Conference"]{
 
 .transferPopupCard {
     width: 100%;
-    max-width: 230px;
-    margin: 0 auto;
+    max-width: none;
+    margin: 0;
     padding: 12px;
     box-sizing: border-box;
-    border-radius: 8px;
+    border-radius: 12px;
     background: #ffffff;
     border: 1px solid rgba(130, 148, 177, 0.35);
-    box-shadow: 0 14px 32px rgba(16, 28, 56, 0.22);
+    box-shadow: none;
 }
 
 .transferPopupTitle {
@@ -2095,7 +2282,7 @@ div[id$="-Conference"]{
 }
 
 .transferActionButton {
-    flex: 1 1 calc(50% - 4px);
+    flex: 1 1 100%;
     min-height: 38px;
     display: inline-flex;
     align-items: center;
@@ -2306,21 +2493,31 @@ div[id$="-Conference"]{
 }
 
 .dtmfNumpadGrid {
-    margin: 0 auto;
-    border-spacing: 2px;
+    margin: 8px auto 0;
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px 10px;
+    justify-items: center;
+    align-items: center;
 }
 
 .dtmfNumpadGrid .dialButtons {
-    width: 42px;
-    height: 34px;
-    min-width: 42px;
-    min-height: 34px;
+    width: 52px;
+    height: 52px;
+    min-width: 52px;
+    min-height: 52px;
     line-height: 1;
-    font-size: 18px;
+    font-size: 20px;
+    border-radius: 999px;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
 }
 
 .dtmfNumpadGrid .dialButtons div {
-    font-size: 18px;
+    font-size: 20px;
     line-height: 1;
 }
 
@@ -2341,10 +2538,10 @@ div[id$="-Conference"]{
 }
 
 .pageContainer.phoneFrame250 .dtmfNumpadGrid .dialButtons {
-    width: 38px;
-    height: 32px;
-    min-width: 38px;
-    min-height: 32px;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
     font-size: 17px;
 }
 
@@ -2403,15 +2600,15 @@ div[id$="-Conference"]{
     }
     .pageContainer.phoneFrame250 {
         --phone-shell-width: 250px;
-        --phone-shell-height: 425px;
-        --phone-shell-padding: 6px;
-        --dial-button-size: 38px;
-        --dial-action-size: 42px;
-        --dial-grid-gap-x: 6px;
-        --dial-grid-gap-y: 1px;
-        --dial-frame-width: 238px;
-        --mobile-pane-height: 313px;
-        --app-bg: #f3f5f9;
+        --phone-shell-height: 457px;
+        --phone-shell-padding: 4px;
+        --dial-button-size: 48px;
+        --dial-action-size: 50px;
+        --dial-grid-gap-x: 14px;
+        --dial-grid-gap-y: 5px;
+        --dial-frame-width: 100%;
+        --mobile-pane-height: 345px;
+        --app-bg: #f1f5f9;
         --surface: #ffffff;
         --text-primary: #1b2432;
         --text-muted: #6f7d96;
@@ -2422,9 +2619,9 @@ div[id$="-Conference"]{
         width: 250px;
         min-width: 250px;
         max-width: 250px !important;
-        height: 425px;
-        min-height: 425px;
-        max-height: 425px;
+        height: 457px;
+        min-height: 457px;
+        max-height: 457px;
         border-radius: 0;
     }
     .pageContainer.phoneStandalone.phoneFrame250 {
@@ -2432,8 +2629,23 @@ div[id$="-Conference"]{
         box-shadow: 0 14px 34px rgba(16, 28, 56, 0.24) !important;
     }
     .pageContainer.phoneEmbedded.phoneFrame250 {
+        /* Fill host iframe — avoid fixed 250x457 + body chrome causing scrollbars */
+        width: 100%;
+        min-width: 0;
+        max-width: none !important;
+        height: 100%;
+        min-height: 0;
+        max-height: none;
         border-radius: 0;
         box-shadow: none !important;
+    }
+    html:has(body.phoneEmbeddedApp),
+    body.phoneEmbeddedApp,
+    body.phoneEmbeddedApp #Phone {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
     }
     #BtnFreeDial, #BtnAddSomeone { display: none !important; }
     #leftContent {
@@ -2478,9 +2690,14 @@ div[id$="-Conference"]{
         background: var(--surface);
         vertical-align: bottom;
     }
-    #leftContentTable > tbody > tr:first-child,
-    #searchArea {
+    #leftContentTable > tbody > tr:first-child {
         display: none !important;
+    }
+    #searchArea {
+        display: none;
+    }
+    #searchArea.phoneSearchVisible {
+        display: flex !important;
     }
 
     #mobileTopBar {
@@ -2494,12 +2711,44 @@ div[id$="-Conference"]{
         border-bottom: 1px solid var(--border);
     }
     .pageContainer.phoneFrame250 #mobileTopBar {
-        height: 42px;
+        height: 44px;
+        padding: 4px 0 2px;
+        background: #ffffff;
+        border-bottom: 1px solid #e6ebf3;
+    }
+    .pageContainer.phoneFrame250 .mobileRegBtn {
+        color: #1e293b;
+    }
+    .pageContainer.phoneFrame250 .mobileRegBtn:hover {
+        background: rgba(148, 163, 184, 0.18);
+        color: #1e293b;
+    }
+    .pageContainer.phoneFrame250 #mobileRegText {
+        color: #1e293b;
+        font-size: 12px;
+        font-weight: 600;
+        max-width: 188px;
+    }
+    .pageContainer.phoneFrame250 #mobileRegDot.dotOnline {
+        background: #22c55e;
+        box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.22);
+    }
+    .pageContainer.phoneFrame250 #mobileRegDot.dotOnline.dotDnd {
+        background: #f59e0b;
+        box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.22);
+    }
+    .pageContainer.phoneFrame250 .mobileTopBtn {
+        color: #475569;
+    }
+    .pageContainer.phoneFrame250 .mobileTopBtn:hover {
+        background: rgba(148, 163, 184, 0.18);
+        color: #1e293b;
     }
     .mobileTopBarInner {
         display: flex;
         align-items: center;
         justify-content: space-between;
+        gap: 8px;
         width: var(--dial-frame-width);
         max-width: calc(100% - (var(--phone-shell-padding) * 2));
         margin: 0 auto;
@@ -2516,26 +2765,46 @@ div[id$="-Conference"]{
     }
     .mobileTopBarActions {
         display: flex;
-        gap: 6px;
+        align-items: center;
+        gap: 2px;
         flex-shrink: 0;
     }
     .mobileTopBtn {
-        width: clamp(26px, 6.2vw, 40px);
-        height: clamp(26px, 6.2vw, 40px);
+        width: clamp(28px, 6.2vw, 40px);
+        height: clamp(28px, 6.2vw, 40px);
         border: none;
         border-radius: 999px;
         background: transparent;
-        color: var(--text-primary);
-        font-size: clamp(14px, 3.5vw, 24px);
-        line-height: clamp(26px, 6.2vw, 40px);
+        color: #475569;
+        font-size: clamp(14px, 3.5vw, 22px);
+        line-height: clamp(28px, 6.2vw, 40px);
         text-align: center;
         padding: 0;
     }
+    .mobileTopBtn:hover {
+        background: rgba(148, 163, 184, 0.18);
+        color: #1e293b;
+    }
     .pageContainer.phoneFrame250 .mobileTopBtn {
-        width: 28px;
-        height: 28px;
-        font-size: 21px;
-        line-height: 28px;
+        width: 30px;
+        height: 30px;
+        font-size: 15px;
+        line-height: 30px;
+    }
+    .mobileTopBtn.mobileRegBtn {
+        width: auto;
+        max-width: 100%;
+        height: auto;
+        min-height: 30px;
+        padding: 0 2px 0 0;
+        line-height: 1.2;
+        text-align: left;
+    }
+    .pageContainer.phoneFrame250 .mobileTopBtn.mobileRegBtn {
+        width: auto;
+        height: auto;
+        font-size: inherit;
+        line-height: 1.2;
     }
     .mobileRegLink {
         width: auto;
@@ -2565,28 +2834,51 @@ div[id$="-Conference"]{
     .mobileRegStatus {
         display: inline-flex;
         align-items: center;
-        gap: 6px;
+        gap: 7px;
         min-width: 0;
+        max-width: 100%;
     }
     #mobileRegDot {
-        font-size: 0;
+        width: 8px;
+        height: 8px;
+        min-width: 8px;
+        border-radius: 999px;
+        font-size: 0 !important;
         line-height: 0;
-        display: inline-flex;
-        align-items: center;
+        display: inline-block;
         flex-shrink: 0;
+        background: #94a3b8;
     }
     #mobileRegDot:before {
-        font-size: clamp(10px, 2.6vw, 14px);
-        line-height: 1;
+        content: "" !important;
+        display: none !important;
+    }
+    #mobileRegDot.dotOnline {
+        background: #22c55e;
+        box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.16);
+    }
+    #mobileRegDot.dotOnline.dotDnd {
+        background: #f59e0b;
+        box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.22);
+    }
+    #mobileRegDot.dotOffline {
+        background: #94a3b8;
+        box-shadow: none;
     }
     #mobileRegText {
         display: inline-block;
-        font-size: clamp(10px, 2.6vw, 14px);
-        line-height: 1;
+        font-size: 12px;
+        font-weight: 600;
+        line-height: 1.2;
+        color: #1e293b;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
-        max-width: 100%;
+        max-width: 140px;
+    }
+    .pageContainer.phoneFrame250 #mobileRegText {
+        font-size: 11px;
+        max-width: 148px;
     }
 
     #bottomTabBar {
@@ -2608,9 +2900,12 @@ div[id$="-Conference"]{
         left: auto;
         transform: none;
         bottom: auto;
-        margin: 0 auto;
+        width: 100%;
+        max-width: 100%;
+        margin: 0;
         height: 56px;
-        padding-bottom: 2px;
+        padding: 2px 0 0;
+        border-bottom: 0;
     }
     .mainTabBar.configActionBar {
         align-items: center;
@@ -2649,26 +2944,39 @@ div[id$="-Conference"]{
         flex: 1;
         border: none;
         background: transparent;
-        color: var(--text-muted);
-        padding: 0;
+        color: #94a3b8;
+        padding: 4px 0 0;
         font-size: 0;
         line-height: 1;
         min-height: 58px;
         min-width: 0;
         opacity: 1;
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 3px;
     }
     .mainTabIcon {
-        display: block;
-        font-size: clamp(17px, 4.8vw, 30px);
-        margin-bottom: 5px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 34px;
+        height: 28px;
+        border-radius: 999px;
+        font-size: clamp(16px, 4.4vw, 22px);
+        margin-bottom: 0;
     }
     .pageContainer.phoneFrame250 .mainTabIcon {
-        font-size: 23px;
-        margin-bottom: 3px;
+        width: 32px;
+        height: 26px;
+        font-size: 18px;
+        margin-bottom: 0;
     }
     .mainTab::after {
         display: block;
-        font-size: clamp(12px, 3.3vw, 19px);
+        font-size: clamp(11px, 3vw, 14px);
         font-weight: 600;
         line-height: 1.1;
         content: attr(data-label);
@@ -2680,7 +2988,22 @@ div[id$="-Conference"]{
         line-height: 1.2;
     }
     .mainTab.activeTab {
-        color: var(--primary);
+        color: #2563eb;
+    }
+    .mainTab.activeTab .mainTabIcon {
+        background: #e8efff;
+        color: #2563eb;
+    }
+    .mainTab.activeTab::before {
+        content: "";
+        position: absolute;
+        top: 2px;
+        left: 50%;
+        width: 18px;
+        height: 3px;
+        border-radius: 999px;
+        background: #2563eb;
+        transform: translateX(-50%);
     }
 
     .contactsTabHeader { display: none !important; }
@@ -2708,10 +3031,12 @@ div[id$="-Conference"]{
     }
     .pageContainer.phoneFrame250 #myContacts,
     .pageContainer.phoneFrame250 #actionArea {
-        height: calc(var(--phone-shell-height) - 42px - 56px);
-        min-height: calc(var(--phone-shell-height) - 42px - 56px);
-        max-height: calc(var(--phone-shell-height) - 42px - 56px);
-        padding-bottom: 4px;
+        height: auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        flex: 1 1 auto;
+        padding: 0;
+        margin-bottom: 0;
     }
     #myContacts.mobilePaneEmpty,
     #actionArea.mobilePaneEmpty {
@@ -2735,40 +3060,62 @@ div[id$="-Conference"]{
         box-sizing: border-box;
     }
     .pageContainer.phoneFrame250 .dialScreenMobile {
-        gap: 3px;
-        margin-top: auto;
-        margin-bottom: 5px;
-        overflow: visible;
-        padding-bottom: 0;
+        width: 100%;
+        height: 100%;
+        min-height: 0;
+        gap: 2px;
+        margin: 0;
+        overflow: hidden;
+        padding: 2px 6px 0;
+        justify-content: space-between;
+        box-sizing: border-box;
     }
     .pageContainer.phoneFrame250 .dialInputRow {
-        width: var(--dial-frame-width);
-        min-height: 36px;
+        width: 100%;
+        max-width: 100%;
+        min-height: 40px;
         display: grid;
-        grid-template-columns: 30px minmax(0, 1fr) 30px;
+        grid-template-columns: 36px minmax(0, 1fr) 36px;
         align-items: center;
         gap: 4px;
-        margin-bottom: 2px;
-        padding: 6px 8px;
-        border: 1px solid #d5deee;
-        border-radius: 12px;
-        background: #edf3fb;
-        box-shadow: inset 0 1px 0 rgba(255,255,255,0.75), 0 1px 4px rgba(27,36,50,0.08);
+        margin-bottom: 0;
+        padding: 0 2px;
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+        box-shadow: none;
+        box-sizing: border-box;
+        flex: 0 0 auto;
     }
     .pageContainer.phoneFrame250 .dialPadGrid {
-        border-spacing: 6px 1px;
+        width: 100%;
+        max-width: 100%;
+        border-spacing: var(--dial-grid-gap-x) var(--dial-grid-gap-y);
+        flex: 0 0 auto;
+        table-layout: fixed;
+    }
+    .pageContainer.phoneFrame250 .dialPadGrid td {
+        text-align: center;
+        vertical-align: middle;
     }
     .pageContainer.phoneFrame250 .dialActionsRow {
-        min-height: 42px;
+        min-height: var(--dial-action-size);
+        margin-top: 0;
+        flex: 0 0 auto;
     }
     .dialInputRow {
         width: auto;
-        min-height: 34px;
+        min-height: 40px;
         margin-top: 0;
         display: flex;
         align-items: center;
         justify-content: center;
         gap: 8px;
+    }
+    .dialInputSpacer {
+        display: block;
+        width: 40px;
+        height: 40px;
     }
     .dialPadGrid {
         margin: 0 auto;
@@ -2782,70 +3129,108 @@ div[id$="-Conference"]{
 
     .dialTextInput {
         width: min(54vw, 230px) !important;
-        height: 32px !important;
+        height: 40px !important;
         background: #ffffff;
-        border: 1px solid #aebbd2;
-        border-radius: 8px;
-        box-shadow: inset 0 1px 3px rgba(27, 36, 50, 0.1);
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
         box-sizing: border-box;
-        color: var(--text-primary);
-        font-size: clamp(16px, 5.2vw, 26px);
-        letter-spacing: 0.6px;
+        color: #1e293b;
+        font-size: clamp(22px, 6vw, 30px);
+        font-weight: 600;
+        letter-spacing: 0.8px;
+        text-align: center;
     }
     .pageContainer.phoneFrame250 .dialTextInput {
         width: 100% !important;
-        height: 34px !important;
+        height: 40px !important;
         grid-column: 2;
-        font-size: 17px;
+        font-size: 22px;
+        font-weight: 600;
+        color: #1e293b;
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
     }
-    #dialDeleteKey {
+    #dialDeleteKey,
+    .dialDeleteBtn {
         background: transparent !important;
-        color: #7f8aa1;
+        color: #475569;
+        border: 0 !important;
+        box-shadow: none !important;
     }
     .pageContainer.phoneFrame250 #dialDeleteKey {
         grid-column: 3;
-        width: 30px;
-        height: 30px;
-        min-width: 30px;
-        min-height: 30px;
-        line-height: 30px;
+        width: 40px;
+        height: 40px;
+        min-width: 40px;
+        min-height: 40px;
+        line-height: 40px;
         padding: 0;
         visibility: hidden;
+        font-size: 16px;
     }
     .pageContainer.phoneFrame250 #dialDeleteKey.hasDigits {
         visibility: visible;
     }
     .dialScreenMobile .dialButtons {
-        color: var(--primary);
-        background: var(--ring);
+        color: #1e293b;
+        background: #ffffff;
         width: var(--dial-button-size);
         height: var(--dial-button-size);
         border-radius: 999px;
         font-size: clamp(18px, min(7vw, 6vh), 34px);
+        font-weight: 600;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08), 0 4px 10px rgba(15, 23, 42, 0.06);
+        border: 1px solid #e2e8f0;
+        display: inline-flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1px;
+        padding: 0;
+        line-height: 1;
+        vertical-align: middle;
     }
     .pageContainer.phoneFrame250 .dialScreenMobile .dialButtons {
-        font-size: 26px;
-        color: #2f6eff;
+        font-size: 22px;
+        color: #1e293b;
+        background: #ffffff;
+        width: var(--dial-button-size);
+        height: var(--dial-button-size);
     }
     .pageContainer.phoneFrame250 .dialScreenMobile .dialButtons div {
-        font-size: 25px;
-        margin-top: 1px;
+        font-size: 22px;
+        font-weight: 600;
+        margin: 0;
+        line-height: 1;
+        color: #1e293b;
     }
     .pageContainer.phoneFrame250 .dialScreenMobile .dialButtons span {
-        font-size: 7px;
+        font-size: 8px;
         line-height: 1;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        margin: 0;
+        color: #64748b;
     }
     .dialScreenMobile .dialButtons div {
         font-size: clamp(18px, min(7vw, 6vh), 34px);
-        margin-top: clamp(3px, min(1.8vw, 1.4vh), 8px);
-        line-height: 0.9;
+        margin: 0;
+        line-height: 1;
+        font-weight: 600;
+        color: #1e293b;
     }
     .dialScreenMobile .dialButtons span {
         font-size: clamp(8px, min(2.3vw, 1.8vh), 12px);
-        color: #7f8aa1;
+        color: #64748b;
+        font-weight: 600;
+        margin: 0;
+        line-height: 1;
     }
     .pageContainer.phoneFrame250 .dialScreenMobile .dialButtons span {
-        color: #7f8ba5;
+        color: #64748b;
     }
     .dialScreenMobile .dialButtonsDial {
         width: var(--dial-action-size);
@@ -2853,31 +3238,80 @@ div[id$="-Conference"]{
         background: #1cb162;
         color: #fff;
         font-size: clamp(20px, min(6.8vw, 5.6vh), 32px);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0;
     }
     .pageContainer.phoneFrame250 .dialScreenMobile .dialButtonsDial {
-        font-size: 23px;
+        font-size: 22px;
+        width: var(--dial-action-size);
+        height: var(--dial-action-size);
+        background: #16a34a;
+        border: 0;
+        box-shadow: 0 8px 16px rgba(22, 163, 74, 0.28);
+        color: #fff;
+    }
+    .pageContainer.phoneFrame250 .dialScreenMobile .dialButtonsDial:active {
+        filter: brightness(0.96);
     }
     .mobileEmptyState {
         width: 100%;
         min-height: 100%;
+        flex: 1 1 auto;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
         text-align: center;
-        padding: 24px 20px;
+        padding: 20px 16px;
         box-sizing: border-box;
-        color: var(--text-muted);
-        opacity: 0.72;
+        color: #64748b;
+        gap: 10px;
     }
-    .mobileEmptyState .fa {
-        font-size: clamp(30px, 9vw, 44px);
-        margin-bottom: 14px;
+    .mobileEmptyIcon {
+        width: 64px;
+        height: 64px;
+        border-radius: 999px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #eef2f7;
+        color: #64748b;
+        border: 1px solid #e2e8f0;
     }
-    .mobileEmptyState p {
+    .mobileEmptyIcon .fa {
+        font-size: 28px;
         margin: 0;
-        font-size: clamp(13px, 3.6vw, 16px);
-        line-height: 1.4;
+        line-height: 1;
+    }
+    .mobileEmptyTitle {
+        margin: 0;
+        max-width: 100%;
+        font-size: 13px;
+        font-weight: 600;
+        line-height: 1.45;
+        color: #475569;
+        white-space: normal;
+        overflow: visible;
+        text-overflow: unset;
+        word-break: break-word;
+    }
+    .mobileEmptyCta {
+        margin-top: 4px;
+        min-height: 34px;
+        padding: 0 14px;
+        border: 0;
+        border-radius: 999px;
+        background: #2d6dff;
+        color: #ffffff;
+        font-size: 12px;
+        font-weight: 700;
+        cursor: pointer;
+        box-shadow: 0 6px 14px rgba(45, 109, 255, 0.22);
+    }
+    .mobileEmptyCta:hover {
+        filter: brightness(1.03);
     }
 
     .buddy,
@@ -2919,48 +3353,77 @@ div[id$="-Conference"]{
         font-size: clamp(10px, 2.8vw, 16px);
     }
 
+    .recentFlatList {
+        width: 100%;
+        background: #ffffff;
+    }
     .recentCallItem {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 8px;
-        min-height: clamp(40px, 8.5vw, 64px);
-        padding: clamp(6px, 2vw, 14px);
-        margin-bottom: clamp(6px, 2vw, 14px);
-        border-radius: clamp(12px, 4vw, 28px);
-        background: var(--surface);
-        border: 1px solid var(--border);
-        border-left: 1px solid var(--border);
+        display: block;
+        min-height: 48px;
+        padding: 10px 12px;
+        margin: 0;
+        border: 0;
+        border-bottom: 1px solid #eef2f7;
+        border-radius: 0;
+        background: transparent;
+        box-shadow: none;
         color: var(--text-primary);
         box-sizing: border-box;
+        cursor: pointer;
+        transition: background-color 120ms ease;
     }
     .enterpriseRecentItem {
         display: block;
         flex: 0 0 auto;
-        min-height: 58px;
-        padding: 9px;
-        border-radius: 16px;
-        box-shadow: 0 8px 20px rgba(24, 36, 64, 0.06);
+        min-height: 48px;
+        padding: 10px 12px;
+        border-radius: 0;
+        box-shadow: none;
         cursor: pointer;
         overflow: visible;
-        transition: border-color 120ms, box-shadow 120ms, background-color 120ms;
+        background: transparent;
+        border: 0;
+        border-bottom: 1px solid #eef2f7;
+        transition: background-color 120ms ease;
+    }
+    .enterpriseRecentItem:hover {
+        background: #f5f5f5;
     }
     .enterpriseRecentItem.expanded {
         position: relative;
         z-index: 4;
-        border-color: #bfd0f0;
-        box-shadow: 0 10px 24px rgba(24, 36, 64, 0.1);
+        background: #f5f5f5;
+        box-shadow: none;
+        border-color: #eef2f7;
     }
     .recentCallSummary {
         display: flex;
         align-items: center;
-        gap: 8px;
+        gap: 10px;
         min-width: 0;
     }
+    .recentSummaryDuration {
+        flex: 0 0 auto;
+        margin-left: auto;
+        padding-left: 8px;
+        color: #64748b;
+        font-size: 11px;
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+        max-width: 42%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        text-align: right;
+    }
+    .recentSummaryDuration.isMissed,
+    .recentSummaryDuration.isStatus {
+        color: #c64e57;
+    }
     .pageContainer.phoneFrame250 .recentCallItem {
-        border-radius: 14px;
-        padding: 8px 7px;
-        margin-bottom: 7px;
+        border-radius: 0;
+        padding: 10px 10px;
+        margin-bottom: 0;
     }
     .recentCallAvatar {
         width: 34px;
@@ -2986,19 +3449,29 @@ div[id$="-Conference"]{
         min-width: 0;
         padding: 0;
     }
-    .recentExpandChevron {
-        width: 18px;
-        height: 18px;
+    .recentExpandChevron,
+    .recentInfoBtn {
+        width: 28px;
+        height: 28px;
         display: flex;
         align-items: center;
         justify-content: center;
         color: #8a96aa;
-        font-size: 10px;
+        font-size: 12px;
         flex-shrink: 0;
-        transition: transform 120ms;
+        border: 0;
+        background: transparent;
+        padding: 0;
+        cursor: pointer;
+        transition: transform 120ms, color 120ms;
     }
-    .enterpriseRecentItem.expanded .recentExpandChevron {
-        transform: rotate(180deg);
+    .enterpriseRecentItem.expanded .recentInfoBtn {
+        transform: rotate(90deg);
+        color: #2563eb;
+    }
+    .recentCallCount {
+        color: #64748b;
+        font-weight: 600;
     }
     .recentCallName,
     .contactCompactName {
@@ -3019,34 +3492,39 @@ div[id$="-Conference"]{
         white-space: nowrap;
     }
     .recentCallSubMeta {
-        margin-top: 4px;
+        margin-top: 3px;
         display: flex;
         align-items: center;
-        gap: 5px;
+        gap: 8px;
         min-width: 0;
         color: var(--text-muted);
-        font-size: clamp(9px, 2.5vw, 12px);
-        line-height: 1.1;
+        font-size: 11px;
+        line-height: 1.2;
         white-space: nowrap;
         overflow: hidden;
-        text-overflow: ellipsis;
+    }
+    .recentTimeLabel,
+    .recentDurationLabel {
+        flex-shrink: 0;
+        font-variant-numeric: tabular-nums;
+    }
+    .recentExpandedStatus {
+        margin: 0 0 8px;
+        font-size: 11px;
+        font-weight: 600;
+        color: #64748b;
+    }
+    .recentExpandedStatus.callMissed {
+        color: #c64e57;
+    }
+    .recentExpandedStatus.callIn {
+        color: #1f8d4d;
+    }
+    .recentExpandedStatus.callOut {
+        color: #2d6dff;
     }
     .recentStatusPill {
-        display: inline-flex;
-        align-items: center;
-        height: 16px;
-        padding: 0 6px;
-        border-radius: 999px;
-        background: #eef3fb;
-        color: #5c6b80;
-        font-size: inherit;
-        font-weight: 600;
-        flex-shrink: 1;
-        min-width: 0;
-        max-width: 76px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
+        display: none;
     }
     .recentStatusPill.callMissed {
         background: #fff1f2;
@@ -3066,14 +3544,18 @@ div[id$="-Conference"]{
         color: #2d6dff;
     }
     .recentDayDivider {
-        width: var(--dial-frame-width);
+        width: 100%;
         max-width: 100%;
-        margin: 4px auto 7px auto;
-        color: #7f8aa1;
+        margin: 0;
+        padding: 10px 12px 6px;
+        color: #64748b;
         font-size: 11px;
         font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0;
+        text-transform: none;
+        letter-spacing: 0.02em;
+        background: #f8fafc;
+        border-bottom: 1px solid #eef2f7;
+        box-sizing: border-box;
     }
     .recentDirectionAvatar {
         font-size: 13px;
@@ -3093,62 +3575,166 @@ div[id$="-Conference"]{
         color: #c64e57;
         border-color: #f5c9ce;
     }
+    .recentCallSvg {
+        display: block;
+        width: 16px;
+        height: 16px;
+    }
     .recentCallExpanded {
         display: none;
-        margin: 8px 0 0 42px;
-        padding-top: 8px;
-        border-top: 1px solid #e3e9f4;
+        margin: 8px 0 0 0;
+        padding: 10px 0 2px 0;
+        border-top: 1px solid #e8edf5;
         clear: both;
     }
     .enterpriseRecentItem.expanded .recentCallExpanded {
         display: block !important;
     }
     .recentExpandedNumber {
-        margin-bottom: 8px;
-        color: var(--text-muted);
+        margin: 0 0 8px;
+        color: #64748b;
         font-size: 12px;
         font-weight: 600;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
     }
-    .recentExpandedNumber .fa {
-        color: #2d6dff;
-        margin-right: 5px;
+    .recentTimeline {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin: 10px 0 0;
+        padding-top: 8px;
+        border-top: 1px solid #e8edf5;
     }
-    .recentExpandedActions {
+    .recentTimelineItem {
         display: flex;
         align-items: center;
         gap: 8px;
+        min-width: 0;
+        font-size: 12px;
+        line-height: 1.3;
+        color: #475569;
     }
-    .recentExpandedActions .roundButtons {
-        width: 30px;
-        height: 30px;
-        min-width: 30px;
-        min-height: 30px;
-        line-height: 30px;
-        margin: 0;
-        padding: 0;
-        font-size: 14px;
-        box-shadow: 0 5px 12px rgba(20, 38, 68, 0.08);
+    .recentTimelineIcon {
+        flex: 0 0 auto;
+        width: 18px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .recentTimelineIcon .recentCallSvg {
+        width: 15px;
+        height: 15px;
+    }
+    .recentDirectionIcon.callOut {
+        color: #2d6dff;
+    }
+    .recentDirectionIcon.callIn {
+        color: #1f9d56;
+    }
+    .recentDirectionIcon.callMissed {
+        color: #c64e57;
+    }
+    .recentTimelineTime {
+        flex: 0 0 auto;
+        min-width: 42px;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+        color: #0f172a;
+    }
+    .recentTimelineDuration {
+        flex: 1 1 auto;
+        margin-left: auto;
+        color: #64748b;
+        font-variant-numeric: tabular-nums;
+        font-weight: 600;
+        text-align: right;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .recentTimelineDuration.isMissed,
+    .recentTimelineDuration.isStatus {
+        color: #c64e57;
+        font-weight: 600;
+        font-variant-numeric: normal;
+    }
+    .recentExpandedActions {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: nowrap;
+        align-items: stretch;
+        justify-content: space-between;
+        gap: 4px;
+        width: 100%;
+        box-sizing: border-box;
+    }
+    .recentTextAction {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        flex: 1 1 0;
+        min-width: 0;
+        min-height: 32px;
+        padding: 6px 4px;
+        border-radius: 8px;
+        border: 1px solid transparent;
+        background: #ffffff;
+        color: #334155;
+        font-size: 10px;
+        font-weight: 600;
+        cursor: pointer;
+        text-align: center;
+        white-space: nowrap;
+    }
+    .recentTextAction span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .recentTextAction .fa {
+        width: 12px;
+        flex: 0 0 auto;
+        text-align: center;
+        font-size: 12px;
     }
     .recentActionCall {
-        background: #2d6dff;
-        color: #ffffff;
+        background: #edf4ff;
+        color: #2d6dff;
+        border-color: #d5e2fb;
+    }
+    .recentActionCall:disabled {
+        opacity: 0.45;
+        cursor: default;
     }
     .recentActionAdd {
-        background: #eef4ff;
+        background: #ffffff;
         color: #2d6dff;
-        border: 1px solid #d5e2fb;
+        border-color: #d5e2fb;
     }
     .recentActionAdd:disabled {
         opacity: 0.45;
         cursor: default;
     }
+    .recentActionCopy {
+        background: #ffffff;
+        color: #475569;
+        border-color: #d7deea;
+    }
+    .recentActionCopy:disabled {
+        opacity: 0.45;
+        cursor: default;
+    }
+    .recentActionCopy.isCopied {
+        background: #ecfdf3;
+        color: #15803d;
+        border-color: #bbf7d0;
+    }
     .recentActionDelete {
-        background: #fff1f2;
+        background: #ffffff;
         color: #c64e57;
-        border: 1px solid #f5c9ce;
+        border-color: #f5c9ce;
     }
     .pageContainer.phoneFrame250 .recentCallMeta {
         margin-top: 2px;
@@ -3190,32 +3776,106 @@ div[id$="-Conference"]{
         margin-left: clamp(36px, 9vw, 58px);
     }
     .enterpriseContactItem {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) 18px;
-        align-items: center;
-        cursor: pointer;
-        overflow: visible;
-        box-shadow: 0 8px 20px rgba(24, 36, 64, 0.06);
-        transition: border-color 120ms, box-shadow 120ms, background-color 120ms;
-    }
-    .enterpriseContactItem.expanded {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 2px;
         position: relative;
-        z-index: 4;
-        border-color: #bfd0f0;
-        box-shadow: 0 10px 24px rgba(24, 36, 64, 0.1);
+        cursor: default;
+        overflow: visible;
+        box-shadow: none;
+        border-radius: 0;
+        border: 0;
+        border-bottom: 1px solid #eef2f7;
+        background: #ffffff;
+        margin: 0;
+        padding: 10px 12px;
+        transition: background-color 120ms;
     }
-    .enterpriseContactItem.expanded .recentExpandChevron {
-        transform: rotate(180deg);
+    .enterpriseContactItem:hover,
+    .enterpriseContactItem.menuOpen {
+        background: #f8fafc;
     }
-    .contactCompactExpanded {
-        display: none;
-        grid-column: 1 / -1;
-        margin: 8px 0 0 0;
-        padding-top: 8px;
-        border-top: 1px solid #e3e9f4;
+    .contactCompactTop {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+        width: 100%;
     }
-    .enterpriseContactItem.expanded .contactCompactExpanded {
-        display: block !important;
+    .contactCompactTop .contactCompactName {
+        flex: 1 1 auto;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .contactCompactActions {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        flex: 0 0 auto;
+        margin-left: auto;
+    }
+    .contactCompactActions .roundButtons {
+        width: 28px;
+        height: 28px;
+        min-width: 28px;
+        min-height: 28px;
+        line-height: 28px;
+        margin: 0;
+        padding: 0;
+        font-size: 13px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .enterpriseContactItem .contactCompactNumber {
+        width: 100%;
+        padding-right: 0;
+        margin-top: 1px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .contactOverflowMenu {
+        position: absolute;
+        top: 36px;
+        right: 10px;
+        z-index: 8;
+        min-width: 120px;
+        padding: 4px;
+        border-radius: 10px;
+        border: 1px solid #e2e8f0;
+        background: #ffffff;
+        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+    .contactOverflowMenu[hidden] {
+        display: none !important;
+    }
+    .contactMenuItem {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        border: 0;
+        background: transparent;
+        color: #334155;
+        font-size: 12px;
+        font-weight: 600;
+        padding: 8px 10px;
+        border-radius: 8px;
+        cursor: pointer;
+        text-align: left;
+    }
+    .contactMenuItem:hover {
+        background: #f1f5f9;
+    }
+    .contactMenuItem.contactActionDelete {
+        color: #c64e57;
     }
     .contactActionCall {
         background: #2d6dff;
@@ -3225,15 +3885,10 @@ div[id$="-Conference"]{
         opacity: 0.45;
         cursor: default;
     }
-    .contactActionEdit {
-        background: #eef4ff;
-        color: #2d6dff;
-        border: 1px solid #d5e2fb;
-    }
-    .contactActionDelete {
-        background: #fff1f2;
-        color: #c64e57;
-        border: 1px solid #f5c9ce;
+    .contactMenuBtn {
+        background: #eef2f8;
+        color: #5f6f8a;
+        border: 1px solid #d7deea;
     }
     .buddyQuickCall {
         width: clamp(30px, 6.5vw, 40px);
@@ -3244,34 +3899,45 @@ div[id$="-Conference"]{
         color: #fff;
     }
     .dialpadSettingToggles {
-        margin: 0 auto 2px auto;
+        margin: 2px auto 0 auto;
         width: fit-content;
         display: flex;
-        gap: 5px;
-        flex-wrap: wrap;
+        gap: 10px;
+        flex-wrap: nowrap;
         justify-content: center;
+        align-items: center;
+        flex: 0 0 auto;
+        padding-top: 4px;
+        border-top: 1px solid #e8edf5;
     }
     .pageContainer.phoneFrame250 .dialpadSettingToggles {
-        margin: 1px auto 0 auto;
-        gap: 4px;
+        margin: 0 auto 2px;
+        gap: 8px;
+        padding-top: 2px;
+        padding-bottom: 2px;
+        position: relative;
+        z-index: 2;
+        background: #f1f5f9;
     }
     #actionArea.dialpadMode {
         height: auto;
         min-height: 0;
         max-height: none;
         overflow: hidden !important;
-        flex: 0 0 auto;
-        padding-bottom: 2px;
+        flex: 1 1 auto;
+        padding-bottom: 0;
     }
     .pageContainer.phoneFrame250 #actionArea.dialpadMode {
-        height: calc(var(--phone-shell-height) - 42px - 56px);
-        min-height: calc(var(--phone-shell-height) - 42px - 56px);
-        max-height: calc(var(--phone-shell-height) - 42px - 56px);
+        height: auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        flex: 1 1 auto;
         display: flex;
         flex-direction: column;
-        justify-content: flex-end;
-        align-items: center;
-        padding-bottom: 2px;
+        justify-content: stretch;
+        align-items: stretch;
+        padding: 0 0 2px !important;
+        overflow: hidden !important;
     }
     #leftContent.dialpadMode #bottomTabBar {
         margin-top: 2px;
@@ -3280,19 +3946,26 @@ div[id$="-Conference"]{
         margin-top: 0;
     }
     .dialpadToggleBtn {
-        width: clamp(26px, 5.8vw, 34px);
-        height: clamp(26px, 5.8vw, 34px);
-        line-height: clamp(26px, 5.8vw, 34px);
-        font-size: clamp(11px, 2.6vw, 16px);
-        border: 1px solid var(--border);
+        width: 28px;
+        height: 28px;
+        min-width: 28px;
+        min-height: 28px;
+        line-height: 28px;
+        font-size: 12px;
+        border: 1px solid #d7deea;
+        border-radius: 999px;
     }
     .pageContainer.phoneFrame250 .dialpadToggleBtn {
-        width: 20px;
-        height: 20px;
-        min-width: 20px;
-        min-height: 20px;
-        line-height: 20px;
-        font-size: 10px;
+        width: 28px;
+        height: 28px;
+        min-width: 28px;
+        min-height: 28px;
+        line-height: 28px;
+        font-size: 11px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
     }
     .dialpadToggleBtn.toggleOn {
         background: #2d6dff;
@@ -3306,11 +3979,7 @@ div[id$="-Conference"]{
     }
 
     .contactCompact {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 8px;
-        min-height: clamp(40px, 8.5vw, 64px);
+        min-height: clamp(44px, 8.5vw, 64px);
     }
     .contactCompactMain {
         flex: 1;
@@ -3332,31 +4001,34 @@ div[id$="-Conference"]{
         min-height: 100%;
         display: flex;
         flex-direction: column;
-        gap: 6px;
-        padding: 0 0 4px 0;
+        gap: 0;
+        padding: 0;
         box-sizing: border-box;
         overflow: hidden;
+        background: #ffffff;
     }
     .configExtensionHeader {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        border: 1px solid var(--border);
-        border-radius: 12px;
-        background: var(--surface);
-        padding: 6px 8px;
+        flex: 0 0 auto;
+        border: 0;
+        border-bottom: 1px solid #eef2f7;
+        border-radius: 0;
+        background: #ffffff;
+        padding: 10px 12px 8px;
         box-sizing: border-box;
     }
     .configExtensionTitle {
-        font-size: 13px;
-        font-weight: 600;
-        color: var(--text-primary);
+        font-size: 14px;
+        font-weight: 700;
+        color: #0f2744;
         display: flex;
         align-items: center;
         gap: 6px;
     }
     .configExtensionForm {
-        padding: 0 2px 0 0 !important;
+        padding: 8px 12px 6px !important;
         flex: 1 1 auto;
         min-height: 0;
         overflow-y: auto;
@@ -3387,21 +4059,68 @@ div[id$="-Conference"]{
     .configExtensionScreen .UiWindowButtonBar {
         height: auto;
         line-height: normal;
-        padding: 8px 0 6px;
-        margin-top: auto;
-        position: sticky;
-        bottom: 0;
+        padding: 8px 12px 10px;
+        margin: 0;
+        position: relative;
+        bottom: auto;
         z-index: 3;
-        border-top: 1px solid var(--border);
-        background: linear-gradient(180deg, rgba(243,245,249,0.65) 0%, rgba(243,245,249,1) 28%);
+        border-top: 1px solid #eef2f7;
+        background: #ffffff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        flex-wrap: nowrap;
+        flex: 0 0 auto;
+    }
+    /* Full-phone overlay for config/settings — covers header so top buttons can't be hit. */
+    .pageContainer.phoneFrame250.phoneModalOpen #actionArea.configOverlayPane,
+    .pageContainer.phoneFrame250 #actionArea.configOverlayPane:has(.configExtensionScreen) {
+        position: absolute !important;
+        inset: 0 !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        min-height: 100% !important;
+        max-height: none !important;
+        flex: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        z-index: 45 !important;
+        background: #ffffff !important;
+        justify-content: flex-start !important;
+        overflow: hidden !important;
+        box-sizing: border-box !important;
+    }
+    .pageContainer.phoneModalOpen #mobileTopBar {
+        pointer-events: none;
+    }
+    .pageContainer.phoneModalOpen #bottomTabBar {
+        display: none !important;
+    }
+    .pageContainer.phoneModalOpen #actionArea:not(.configOverlayPane) {
+        height: auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        flex: 1 1 auto !important;
+        padding-bottom: 8px !important;
     }
     .configExtensionScreen .UiWindowButtonBar button {
-        min-width: 86px;
+        flex: 1 1 0;
+        min-width: 0;
         min-height: 32px;
         border: 1px solid var(--border);
         background: var(--surface);
         color: var(--text-primary);
         font-weight: 600;
+        font-size: 12px;
+        padding: 0 4px;
+        white-space: nowrap;
+    }
+    .pageContainer.phoneFrame250 .configExtensionScreen .UiWindowButtonBar button {
+        min-width: 0;
+        font-size: 12px;
     }
     .configExtensionScreen .UiWindowButtonBar button.configPrimaryButton {
         background: var(--primary);
@@ -3470,10 +4189,16 @@ div[id$="-Conference"]{
         border-radius: 6px;
         font-weight: 600;
     }
-    .panelConfirmActions .configPrimaryButton {
-        background: var(--primary);
-        border-color: var(--primary);
+    .panelConfirmActions .configPrimaryButton,
+    .panelConfirmActions .panelConfirmOk {
+        background: #dc2626;
+        border-color: #dc2626;
         color: #ffffff;
+    }
+    .panelConfirmActions .configPrimaryButton:hover,
+    .panelConfirmActions .panelConfirmOk:hover {
+        background: #b91c1c;
+        border-color: #b91c1c;
     }
     .panelConfirmActions .configSecondaryButton {
         background: #e9eef8;
@@ -3486,6 +4211,560 @@ div[id$="-Conference"]{
         min-height: 100%;
         height: 100%;
         overflow: hidden;
+    }
+
+    .vphoneCallScreen {
+        width: 100%;
+        height: 100%;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        padding: 0;
+        box-sizing: border-box;
+        background: #ffffff;
+    }
+    .vphoneCallCard {
+        flex: 1 1 auto;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: space-between;
+        padding: 36px 16px 28px;
+        background: #ffffff;
+        box-sizing: border-box;
+    }
+    .vphoneCallCardActive {
+        padding: 22px 12px 12px;
+        justify-content: flex-start;
+        gap: 10px;
+        background: #f4f7fb;
+    }
+    .vphoneCallPeer {
+        margin-top: 12px;
+        font-size: 26px;
+        font-weight: 700;
+        line-height: 1.15;
+        color: #0f2744;
+        text-align: center;
+        word-break: break-word;
+    }
+    .vphoneCallCardActive .vphoneCallPeer {
+        margin-top: 2px;
+        font-size: 24px;
+    }
+    .vphoneCallPeerSub {
+        margin-top: 4px;
+        font-size: 12px;
+        color: #64748b;
+        text-align: center;
+    }
+    .vphoneCallStatus,
+    .vphoneCallTimer {
+        margin-top: 8px;
+        font-size: 13px;
+        font-weight: 500;
+        color: #7b879b;
+        text-align: center;
+    }
+    .vphoneCallTimer {
+        font-variant-numeric: tabular-nums;
+        letter-spacing: 0.04em;
+        color: #5b6b82;
+    }
+    .vphoneCallActions {
+        width: 100%;
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        gap: 40px;
+        margin-top: auto;
+        padding-top: 28px;
+        padding-bottom: 8px;
+    }
+    .vphoneCallActionsSingle {
+        gap: 0;
+    }
+    .vphoneCallActionBtn {
+        border: 0;
+        background: transparent;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        color: inherit;
+    }
+    .vphoneCallActionBtn:disabled,
+    .vphoneCallActionBtn.isIdle {
+        cursor: default;
+    }
+    .vphoneCallActionIcon {
+        width: 66px;
+        height: 66px;
+        border-radius: 999px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: #ffffff;
+        font-size: 24px;
+        box-shadow: 0 10px 22px rgba(15, 39, 68, 0.18);
+    }
+    .vphoneCallActionAnswer .vphoneCallActionIcon {
+        background: #22c55e;
+        box-shadow: 0 10px 22px rgba(34, 197, 94, 0.34);
+    }
+    .vphoneCallActionReject .vphoneCallActionIcon {
+        background: #ef4444;
+        box-shadow: 0 10px 22px rgba(239, 68, 68, 0.32);
+    }
+    .vphoneCallActionLabel {
+        font-size: 13px;
+        font-weight: 600;
+        color: #334155;
+    }
+    .vphoneInCallPanel {
+        width: 100%;
+        margin-top: 8px;
+        padding: 16px 10px 14px;
+        border-radius: 16px;
+        background: #ffffff;
+        border: 1px solid #e6edf5;
+        box-shadow: 0 8px 20px rgba(15, 39, 68, 0.08);
+        box-sizing: border-box;
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow: hidden;
+    }
+    .vphoneInCallMain {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        flex: 1 1 auto;
+        min-height: 0;
+    }
+    /* Overlay/DTMF replace only the control grid — keep peer, timer, hangup in place. */
+    .vphoneInCallPanel.isOverlayOpen .vphoneInCallMain,
+    .vphoneInCallPanel.isDtmfOpen .vphoneInCallMain {
+        display: none;
+    }
+    .vphoneInCallOverlay {
+        flex: 1 1 auto;
+        min-height: 0;
+        width: 100%;
+        flex-direction: column;
+        background: #ffffff;
+        z-index: 5;
+    }
+    .vphoneInCallOverlayCard {
+        flex: 1 1 auto;
+        min-height: 0;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        padding: 4px 2px 0;
+        box-sizing: border-box;
+        border: 0;
+        border-radius: 0;
+        box-shadow: none;
+        overflow: auto;
+    }
+    .vphoneDtmfCard {
+        width: 100%;
+        flex: 1 1 auto;
+        min-height: 0;
+        display: none;
+        flex-direction: column;
+        flex-wrap: nowrap;
+        gap: 4px;
+        padding: 0;
+        border-radius: 0;
+        background: transparent;
+        border: 0;
+        box-shadow: none;
+        box-sizing: border-box;
+        overflow: hidden;
+    }
+    .vphoneInCallPanel.isDtmfOpen .vphoneDtmfCard {
+        display: flex !important;
+    }
+    .vphoneInCallPanel.isDtmfOpen .vphoneInCallHangupRow {
+        display: none;
+    }
+    .vphoneDtmfHeader {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 6px;
+        flex: 0 0 auto;
+        order: 1;
+        min-height: 0;
+    }
+    .vphoneDtmfTitle {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        font-weight: 700;
+        color: #1e293b;
+    }
+    .vphoneDtmfClose {
+        width: 24px;
+        height: 24px;
+        border: 0;
+        border-radius: 999px;
+        background: #f1f5f9;
+        color: #64748b;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        padding: 0;
+        font-size: 12px;
+        line-height: 1;
+        flex-shrink: 0;
+    }
+    .vphoneDtmfDisplay {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+        flex: 0 0 auto;
+        order: 2;
+        width: 100%;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        padding: 0 6px;
+        box-sizing: border-box;
+        margin: 0;
+    }
+    .vphoneDtmfDisplay input {
+        flex: 1 1 auto;
+        min-width: 0;
+        width: 100%;
+        height: 24px;
+        border: 0;
+        outline: none;
+        background: transparent;
+        font-size: 14px;
+        font-weight: 600;
+        color: #0f172a;
+        letter-spacing: 1px;
+        padding: 0;
+    }
+    .vphoneDtmfBackspace {
+        border: 0;
+        background: transparent;
+        color: #64748b;
+        font-size: 14px;
+        cursor: pointer;
+        padding: 2px 4px;
+        line-height: 1;
+        flex-shrink: 0;
+    }
+    .vphoneDtmfGrid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-rows: repeat(4, minmax(0, 1fr));
+        gap: 4px;
+        justify-items: center;
+        align-items: center;
+        align-content: stretch;
+        flex: 1 1 auto;
+        order: 3;
+        min-height: 0;
+        width: 100%;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+    }
+    .vphoneDtmfKey {
+        width: min(34px, 100%);
+        height: min(34px, 100%);
+        aspect-ratio: 1;
+        max-width: 100%;
+        border: 0;
+        border-radius: 999px;
+        background: #f1f5f9;
+        color: #1e293b;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        margin: 0;
+        transition: background 0.15s ease, transform 0.05s ease;
+    }
+    .vphoneDtmfKey:hover {
+        background: #e2e8f0;
+    }
+    .vphoneDtmfKey:active {
+        transform: scale(0.94);
+        background: #cbd5e1;
+    }
+    .vphoneInCallOverlayHeader {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 12px;
+    }
+    .vphoneInCallOverlayTitle {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+        font-size: 13px;
+        font-weight: 800;
+        color: #0f2744;
+    }
+    .vphoneInCallOverlayClose {
+        width: 30px;
+        height: 30px;
+        border: 0;
+        border-radius: 999px;
+        background: #f1f5f9;
+        color: #475569;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        flex-shrink: 0;
+        padding: 0;
+        font-size: 14px;
+    }
+    .vphoneInCallOverlayClose:hover {
+        background: #e2e8f0;
+        color: #0f172a;
+    }
+    .vphoneInCallGrid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 14px 6px;
+        width: 100%;
+    }
+    .vphoneInCallBtn {
+        border: 0;
+        background: transparent;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 6px;
+        min-height: 58px;
+        padding: 4px 2px;
+        color: #2f6bff;
+        cursor: pointer;
+    }
+    .vphoneInCallBtn .fa {
+        font-size: 20px;
+        line-height: 1;
+    }
+    .vphoneInCallBtn span {
+        font-size: 10px;
+        font-weight: 600;
+        line-height: 1.2;
+        color: #475569;
+        text-align: center;
+    }
+    .vphoneInCallBtn.isOn,
+    .vphoneInCallBtn.isOn span {
+        color: #1d4ed8;
+    }
+    .vphoneInCallHangupRow {
+        display: flex;
+        justify-content: center;
+        padding-top: 4px;
+        margin-top: auto;
+        flex: 0 0 auto;
+    }
+    .vphoneInCallHangupRow .hangupButton,
+    .vphoneInCallHangupRow .vphoneCallActionBtn {
+        width: 56px;
+        height: 56px;
+        min-width: 56px;
+        min-height: 56px;
+        padding: 0;
+        border: 0;
+        border-radius: 999px;
+        overflow: hidden;
+        background: #ef4444;
+        box-shadow: 0 10px 22px rgba(239, 68, 68, 0.32);
+        line-height: 56px;
+    }
+    .vphoneInCallHangupRow .vphoneCallActionIcon {
+        width: 56px;
+        height: 56px;
+        font-size: 20px;
+        border-radius: 999px;
+        background: transparent;
+        box-shadow: none;
+    }
+    .pageContainer.phoneFrame250 .vphoneInCallHangupRow .hangupButton {
+        width: 56px;
+        height: 56px;
+        min-width: 56px;
+        min-height: 56px;
+        border-radius: 999px;
+        background: #ef4444;
+        color: #ffffff;
+        line-height: 56px;
+        padding: 0;
+    }
+    .pageContainer.phoneFrame250 #actionArea:has(.vphoneCallScreen) {
+        padding: 0 !important;
+        overflow: hidden !important;
+        background: #ffffff !important;
+    }
+    .pageContainer.phoneFrame250 #bottomTabBar {
+        border-top: 1px solid #e6ebf3;
+        background: #ffffff;
+    }
+    .pageContainer.phoneFrame250 .mainTab {
+        color: #94a3b8;
+        gap: 4px;
+        min-height: 52px;
+        padding-top: 6px;
+    }
+    .pageContainer.phoneFrame250 .mainTab.activeTab {
+        color: #2563eb;
+    }
+    .pageContainer.phoneFrame250 .mainTab.activeTab .mainTabIcon {
+        background: transparent;
+        color: #2563eb;
+    }
+    .pageContainer.phoneFrame250 .mainTab.activeTab::before {
+        top: 0;
+        width: 22px;
+        height: 3px;
+        background: #2563eb;
+    }
+
+    .phoneApp {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        width: 250px;
+        height: 457px;
+        max-width: 250px;
+        background: #f6f8fc;
+        overflow: hidden;
+        border-radius: 14px;
+    }
+    .phoneHeaderBar {
+        flex: 0 0 auto;
+        padding: 8px 10px 4px;
+        background: #ffffff;
+        border-bottom: 1px solid #e6ebf3;
+    }
+    /* Mobile/embed shell uses #mobileTopBar; hide legacy extension header */
+    .pageContainer.phoneFrame250 .phoneHeaderBar,
+    .pageContainer.phoneFrame250 #UserProfile,
+    .pageContainer.phoneFrame250 #SettingsMenu {
+        display: none !important;
+    }
+    .phoneSearch {
+        display: none;
+        align-items: center;
+        gap: 6px;
+        flex: 0 0 auto;
+        padding: 6px 8px 4px;
+        box-sizing: border-box;
+    }
+    .phoneSearch.phoneSearchVisible {
+        display: flex !important;
+    }
+    .phoneSearchField {
+        position: relative;
+        display: flex;
+        align-items: center;
+        width: 100%;
+        min-height: 34px;
+        border: 1px solid #d7deea;
+        border-radius: 10px;
+        background: #ffffff;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+        overflow: hidden;
+    }
+    .phoneSearchIcon {
+        position: absolute;
+        left: 10px;
+        color: #94a3b8;
+        font-size: 13px;
+        pointer-events: none;
+    }
+    .phoneSearchField input {
+        width: 100%;
+        height: 34px;
+        border: 0;
+        outline: none;
+        background: transparent;
+        padding: 0 10px 0 30px;
+        font-size: 13px;
+        color: #1e293b;
+        box-sizing: border-box;
+    }
+    .phoneBodyList {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow: auto;
+        padding: 4px 0 8px;
+    }
+    .phoneApp .mainTabBar {
+        flex: 0 0 56px;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        background: #ffffff;
+        border-top: 1px solid #e6ebf3;
+        margin: 0;
+        width: 100%;
+        max-width: 100%;
+    }
+    .pageContainer.phoneFrame250.phoneApp,
+    .pageContainer.phoneFrame250 {
+        display: flex;
+        flex-direction: column;
+    }
+    .pageContainer.phoneFrame250 #mobileTopBar {
+        flex: 0 0 auto;
+    }
+    .pageContainer.phoneFrame250 #actionArea,
+    .pageContainer.phoneFrame250 #myContacts {
+        flex: 1 1 auto;
+        min-height: 0;
+    }
+    .pageContainer.phoneFrame250 #bottomTabBar {
+        margin-top: auto;
+    }
+    .recentDayDivider {
+        padding: 10px 12px 4px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+        color: #64748b;
+    }
+    .enterpriseRecentItem {
+        padding: 8px 12px;
+        border-bottom: 1px solid #eef2f7;
+    }
+    .recentCallSubMeta {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 11px;
+        color: #64748b;
+    }
+    .inCallButtons.toggleOn {
+        color: #1d4ed8;
+        box-shadow: inset 0 0 0 2px #93c5fd;
     }
 
     /* ===== HIDE CHAT UI ===== */

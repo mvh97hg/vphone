@@ -1,38 +1,57 @@
 #!/usr/bin/env node
-const fs = require('node:fs');
-const path = require('node:path');
-const { spawnSync } = require('node:child_process');
+const fs = require("node:fs");
+const path = require("node:path");
 
-function readJson(filePath) {
-  try {
-    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
-  } catch (error) {
-    return null;
+const desktopRoot = path.resolve(__dirname, "..");
+const repoRoot = path.resolve(desktopRoot, "..", "..");
+const runtimeDir = path.join(desktopRoot, "renderer", "runtime");
+
+const sources = [
+  ["src/core", "core"],
+  ["src/sdk", "sdk"],
+  ["src/ui", "ui"],
+  ["src/assets", "assets"],
+];
+
+function copyDirectory(source, target) {
+  if (!fs.existsSync(source)) {
+    throw new Error(`Missing runtime source: ${source}`);
   }
+  const stat = fs.statSync(source);
+  if (stat.isDirectory()) {
+    fs.mkdirSync(target, { recursive: true });
+    for (const child of fs.readdirSync(source)) {
+      copyDirectory(path.join(source, child), path.join(target, child));
+    }
+    return;
+  }
+  if (!stat.isFile()) return;
+
+  const normalized = source.replace(/\\/g, "/");
+  if (normalized.includes("/node_modules/") || normalized.includes("/.tmp/")) return;
+
+  const next = fs.readFileSync(source);
+  if (fs.existsSync(target)) {
+    const current = fs.readFileSync(target);
+    if (Buffer.compare(current, next) === 0) return;
+  }
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  fs.writeFileSync(target, next);
 }
 
-const desktopRoot = path.resolve(__dirname, '..');
-const repoRoot = path.resolve(desktopRoot, '..', '..');
-const libDir = path.join(repoRoot, 'lib');
-const packageJsonPath = path.join(desktopRoot, 'package.json');
+function main() {
+  fs.mkdirSync(runtimeDir, { recursive: true });
 
-const packageJson = readJson(packageJsonPath) || {};
-const selectedLangs = Array.isArray(packageJson.vphone && packageJson.vphone.buildLanguages)
-  ? packageJson.vphone.buildLanguages.map((v) => String(v || '').trim()).filter(Boolean)
-  : [];
-const langs = selectedLangs.length > 0 ? selectedLangs.join(',') : 'en,vi';
+  for (const [sourceRel, targetRel] of sources) {
+    copyDirectory(path.join(repoRoot, sourceRel), path.join(runtimeDir, targetRel));
+  }
 
-console.log('[build-widget] Languages:', langs);
+  const sourceCss = path.join(repoRoot, "src", "ui", "styles", "phone-ui.css");
+  const rendererCss = path.join(desktopRoot, "renderer", "phone-ui.css");
+  fs.copyFileSync(sourceCss, rendererCss);
 
-function runBuild(cmd, args) {
-  return spawnSync(cmd, args, {
-    cwd: libDir,
-    stdio: 'inherit',
-    env: Object.assign({}, process.env, { VPHONE_LANGS: langs })
-  });
+  console.log("[build-widget] Copied src runtime to", runtimeDir);
+  console.log("[build-widget] Synced renderer phone-ui.css");
 }
 
-const nodeBin = process.execPath;
-const buildScript = path.join(libDir, 'scripts', 'build-single-file.js');
-const result = runBuild(nodeBin, [buildScript]);
-if (result.status !== 0) process.exit(result.status || 1);
+main();

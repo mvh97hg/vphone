@@ -39,13 +39,23 @@ desktop/electron/builder-*.yml
 desktop/electron/builder-*.yaml
 lib/package-lock.json
 lib/dist/
-lib/vphone.min.js
+# Legacy / build intermediates (source is lib/vphone.js; release is lib/vphone.min.js)
+lib/vphone-widget.js
 lib/vphone-widget.min.js
 lib/embedded-ui-data.js
+lib/vphone.combined.js
+lib/vphone.min.js.map
 lib/*.log
+Phone/
 
 # Local updater/cache artifacts
 vphone-updater/
+artifacts_*.txt
+temp.md
+image.png
+image-1.png
+legacy-phone-dom.html
+.antigravitycli/
 
 # Test files with credentials/config (user-specific)
 test.html

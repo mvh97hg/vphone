@@ -34,6 +34,7 @@
           this.registers = 0;
           this.unregisters = 0;
           this.answers = 0;
+          this.rejects = [];
         }
 
         on(eventName, handler) {
@@ -77,6 +78,11 @@
         async answer() {
           this.answers += 1;
           this.emit("call-connected", { direction: "incoming" });
+        }
+
+        async reject(options = {}) {
+          this.rejects.push(options);
+          this.emit("call-ended");
         }
 
         hangup() {
@@ -411,6 +417,28 @@
           profileName: embeddedRoot.querySelector("#Configure_Account_profileName")?.value || ""
         };
 
+        const dndRoot = document.createElement("div");
+        document.body.appendChild(dndRoot);
+        const dndSdk = new FakeSdk();
+        createPhoneWidget({ root: dndRoot, config: { Language: "en" }, deps: { sdk: dndSdk } });
+        await flush();
+        dndRoot.querySelector("#dialpad-toggle-dnd")?.click();
+        await flush();
+        dndSdk.emit("incoming-call", { from: "sip:1008@example.test", displayName: "DND Test" });
+        await flush();
+        const dndRejectedWith486 = dndSdk.rejects.some((item) => item.statusCode === 486);
+
+        const autoRoot = document.createElement("div");
+        document.body.appendChild(autoRoot);
+        const autoSdk = new FakeSdk();
+        createPhoneWidget({ root: autoRoot, config: { Language: "en" }, deps: { sdk: autoSdk } });
+        await flush();
+        autoRoot.querySelector("#dialpad-toggle-auto")?.click();
+        await flush();
+        autoSdk.emit("incoming-call", { from: "sip:1009@example.test", displayName: "Auto Test" });
+        await flush();
+        const autoAnsweredIncoming = autoSdk.answers === 1;
+
         const lastCall = sdk.calls[sdk.calls.length - 1];
         return {
           pass:
@@ -502,7 +530,9 @@
             embeddedConfigFields.domain === "example.test" &&
             embeddedConfigFields.username === "3001" &&
             embeddedConfigFields.password === "secret" &&
-            embeddedConfigFields.profileName === "Embedded User",
+            embeddedConfigFields.profileName === "Embedded User" &&
+            dndRejectedWith486 &&
+            autoAnsweredIncoming,
           dialActionsRowCount,
           hasExtraDialpadCallControls,
           callCount: sdk.calls.length,
@@ -576,7 +606,9 @@
           embeddedTransferHidden,
           embeddedConferenceHidden,
           embeddedVideoInCallHidden,
-          embeddedConfigFields
+          embeddedConfigFields,
+          dndRejectedWith486,
+          autoAnsweredIncoming
         };
       }
 

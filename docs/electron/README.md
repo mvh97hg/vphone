@@ -1,16 +1,18 @@
 # VPhone Electron Desktop
 
-Electron desktop shell for the existing VPhone UI.
+Electron desktop app with a native renderer UI. Call control still uses the shared `src/core` + `src/sdk` runtime. The web embed widget is separate and is not mounted inside the desktop window.
 
 ## What It Does
 
-- Loads only `lib/vphone-widget.min.js` (UI + core runtime).
-- Mounts the embedded phone UI inline in a desktop window.
+- Builds a TypeScript renderer (`renderer/src`) onto `PhoneSDK` — dialpad, recents, contacts, in-call, settings.
+- Does **not** copy or mount `src/ui/phone-widget.js`.
+- Vendors SIP.js locally (`vendor/sip-0.21.2.min.js`) instead of loading CDN on startup.
+- Uses local-only keyboard shortcuts while the window is focused. Global answer/hangup is registered only during an incoming or active call when the window is not focused.
 - Grants microphone, camera, notification, and screen-capture permissions through Electron.
 - Reads SIP config from local `config.json` (or `VPHONE_DESKTOP_CONFIG` path).
-- Writes desktop, renderer, and phone-console diagnostics to a local log file.
-- Uses a fixed 250x453 shell so the embedded 250x425 call panel keeps its configured size below the draggable titlebar.
-- Supports icon overrides for desktop window/tray and web UI notifications/avatar.
+- Writes desktop, renderer, and phone diagnostics to a local log file.
+- Uses a fixed 250x453 shell below the draggable titlebar.
+- Supports icon overrides for desktop window/tray.
 
 ## Install
 
@@ -50,11 +52,13 @@ With pnpm:
 pnpm start
 ```
 
-The dev app reads built runtime artifacts from the repository root:
+The dev app builds the desktop TypeScript shell:
 
-- `../../lib/vphone-widget.min.js`
+```bash
+pnpm run build:desktop
+```
 
-Run `npm run build:release` in `lib/` after changing `Phone/phone.js` or `Phone/phone.css`.
+That compiles `src/main.ts`, `src/preload.ts`, and `renderer/src/app.ts`, and copies the local SIP.js vendor file. It does **not** copy the library widget into the Electron app.
 
 ## Configure SIP
 
@@ -106,50 +110,38 @@ Common config:
     "SipDomain": "",
     "SipUsername": "",
     "SipPassword": "",
-    "SipPasswordType": "plain",
+    "SipPasswordType": "",
     "Language": "vi",
-    "MediaConfig": {
-        "ringtone": "",
-        "ringbackTone": "",
-        "holdMusic": "",
-        "notificationSound": ""
-    },
+    "MediaConfig": { "ringtone": "" },
     "NotificationsActive": false,
-    "EnableNotificationSettings": false,
-    "TransportReconnectionAttempts": 999,
-    "TransportReconnectionTimeout": 3,
-    "HideSettingsButton": false,
+    "SettingsButton": true,
     "MaxDidLength": 24,
     "EnableVideoCalling": false,
     "EnableTransfer": true,
-    "EnableConference": true,
-    "EnableTextMessaging": false,
-    "RecordAllCalls": false,
-    "CallRecordingPolicy": "allow",
-    "AutoAnswerPolicy": "allow",
-    "DoNotDisturbPolicy": "allow",
-    "CallWaitingPolicy": "allow",
-    "KeyboardShortcuts": {
-      "answer": "F2",
-      "hangup": "Escape",
-      "hold": "F4",
-      "mute": "F6",
-      "transfer": "F8",
-      "dialpad": "F9"
-    },
-    "DisableBuddies": false,
+    "EnableConference": false,
+    "EnableRingtone": true,
+    "HideRecordAllCallsButton": true,
     "DisableFreeDial": false,
-    "IceStunServerJson": ""
+    "KeyboardShortcuts": {
+      "answer": "Alt+A",
+      "hangup": "Alt+C",
+      "hold": "Alt+H",
+      "mute": "Alt+M",
+      "transfer": "Alt+T"
+    },
+    "IceStunServerJson": "",
+    "IceStunCheckTimeout": 500,
+    "HoldMode": "sip",
+    "HoldIceRestart": false
   }
 }
-
 ```
 
 Media config priority:
 
 1. Values edited in phone `Settings` UI (saved in local storage)
 2. `phone.MediaConfig` from desktop config
-3. Embedded default media shipped with `vphone-widget.min.js`
+3. Embedded default media shipped with the desktop renderer / `vphone.min.js`
 
 Icon override behavior:
 
@@ -168,6 +160,19 @@ All icon fields accept:
 
 The default example intentionally leaves SIP credentials blank so the app opens the UI first. Use the `...` settings menu inside the phone panel to enter extension details, or edit `config.json` before launching. The embedded phone uses the same SIP WebSocket reconnect loop as the web app; `TransportReconnectionAttempts` and `TransportReconnectionTimeout` control retry count and interval.
 
+Hold behavior:
+
+- `phone.HoldMode` (`sip` default):
+  - `sip` — standards re-INVITE hold (`a=sendonly` / resume `a=sendrecv`) so the PBX can play MOH and run hold-related dialplan.
+  - `local` — mute tracks only (no SIP signaling); PBX will not see hold.
+- `phone.HoldIceRestart` (`false` default): keep `false` (legacy). `true` + rtpengine `ICE=force` commonly causes Role conflict / bad ICE username / DTLS close.
+
+Password storage:
+
+- When you save the extension password in the UI, Electron encrypts it with OS `safeStorage` (DPAPI on Windows, Keychain on macOS) before writing to `localStorage` as `vphone:safe:...`.
+- Existing plaintext `SipPassword` values are migrated automatically on next launch.
+- The password still exists in memory while the app runs (required for SIP REGISTER).
+
 Transport scheme:
 
 - `phone.Wss=true` => uses `wss://` (default).
@@ -176,9 +181,28 @@ Transport scheme:
 Language build optimization:
 
 - Build scripts read `vphone.buildLanguages` from `desktop/electron/package.json`.
-- Only selected language packs are embedded into `vphone-widget.min.js`.
+- Only selected language packs are embedded into `vphone.min.js` / the desktop build.
 - Electron packaged `locales/*.pak` is also pruned by `afterPack` to match selected languages.
 - Example: `["en","vi"]` => keep `en-US.pak`, `vi.pak`.
+
+## Debug WSS / SIP (Chrome DevTools)
+
+Open Chromium DevTools in the Electron window:
+
+- `F12` or `Ctrl+Shift+I` (macOS: `Cmd+Option+I`)
+- Or auto-open on launch:
+
+```bash
+$env:VPHONE_DEVTOOLS="1"
+pnpm start
+```
+
+Useful tabs:
+
+- **Network → WS**: select the `wss://...` (or `ws://...`) socket and inspect frames (SIP REGISTER/INVITE/etc.).
+- **Console**: renderer logs (registration errors, SDK messages). Set `"TraceSip": true` in `phone` config for SIP tracing when supported by the runtime.
+
+Also check the desktop log file below for main/renderer diagnostics.
 
 ## Diagnostics
 
@@ -197,9 +221,8 @@ The log captures:
 
 - sanitized desktop config loading
 - Electron permission decisions
-- renderer boot and media-device counts
+- renderer boot
 - VPhone status/call events
-- console messages from the embedded phone iframe
 - renderer load and crash errors
 
 For real register testing without the smoke script, create or point to a JSON config, launch the app, wait for `Online`, then call `1235` from the dialpad. If registration fails, inspect the latest log entries and SIP trace lines in `vphone-desktop.log`.
@@ -253,7 +276,7 @@ Sensitive config packaging note:
 - `display-capture` for screen sharing.
 - `fullscreen` for video/fullscreen behavior.
 
-At startup the renderer proactively calls `getUserMedia({ audio: true })` and then stops the track. This triggers the browser/Electron media permission flow and unlocks microphone labels for the settings device list.
+At startup the renderer no longer prompts for microphone or speaker selection. Media is requested when a call starts or when Settings is opened.
 
 The SIP endpoint must support WebRTC over secure WebSocket (`wss://`) and DTLS-SRTP.
 

@@ -2,13 +2,12 @@
 
 ## Core
 
-- `/README.md` - project overview and quick start.
-- `/lib/README.md` - library usage and integration basics.
+- [`/README.md`](../README.md) — project overview
+- [`/lib/README.md`](../lib/README.md) — **single-file library** (`vphone.min.js`) usage and config
 
-## Detailed Guides
+## Other
 
-- `/docs/library/LIBRARY_API.md` - full runtime and SDK API reference.
-- `/docs/library/CLICK_TO_CALL.md` - click-to-call patterns and examples.
-- `/docs/library/EMBEDDED_UI_GUIDE.md` - embedded UI distribution notes.
-- `/docs/electron/README.md` - Electron desktop runtime/build guide.
-- `/docs/examples/README.md` - examples, profiles, and testing usage.
+- [`/docs/library/README.md`](./library/README.md) — pointer to lib docs
+- [`/docs/electron/README.md`](./electron/README.md) — Electron desktop
+- [`/docs/examples/README.md`](./examples/README.md) — demos and profiles
+- [`/docs/examples/demo.html`](./examples/demo.html) — embed / makeCall demo
