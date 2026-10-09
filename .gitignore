@@ -25,6 +25,16 @@ yarn-error.log*
 pnpm-debug.log*
 coverage/
 .codex/
+.cursor/
+.claude/
+.agents/
+docs/superpowers/
+**/AGENTS.MD
+**/AGENTS.md
+**/CLAUDE.md
+**/GEMINI.md
+.cursorrules
+.aider*
 # Node / npm local artifacts
 dist/
 node_modules/
