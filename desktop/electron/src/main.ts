@@ -6,6 +6,7 @@ const {
   globalShortcut,
   ipcMain,
   Menu,
+  nativeImage,
   safeStorage,
   session,
   shell,
@@ -16,14 +17,19 @@ const {
 const rendererPath = path.join(__dirname, "renderer", "index.html");
 const configPath = path.join(__dirname, "config.json");
 const packageJsonPath = path.join(__dirname, "package.json");
-const DESKTOP_APP_ID = "com.vphone.app";
+// Bump when Windows shells keep a stale Electron taskbar icon for the old AUMID.
+const DESKTOP_APP_ID = "com.vphone.softphone";
 let logFilePath = null;
 let mainWindow = null;
 let tray = null;
 let callPhase = "idle";
 let cachedShortcutConfig = null;
+let lastShortcutAction = "";
+let lastShortcutAt = 0;
+const SHORTCUT_DEBOUNCE_MS = 350;
 const LOG_MAX_BYTES = 5 * 1024 * 1024; // 5 MB
 const LOG_MAX_BACKUPS = 5;
+
 
 function isDesktopDevMode() {
   const flag = String(process.env.VPHONE_DEVTOOLS || process.env.VPHONE_DEV || "").toLowerCase();
@@ -32,6 +38,11 @@ function isDesktopDevMode() {
 }
 
 app.setName("VPhone");
+// Windows taskbar/jump-list icon is keyed by AUMID — set before ready so the
+// shell does not keep a stale Electron association from an earlier run.
+if (process.platform === "win32") {
+  app.setAppUserModelId(DESKTOP_APP_ID);
+}
 
 if (process.env.VPHONE_DESKTOP_USER_DATA) {
   app.setPath("userData", process.env.VPHONE_DESKTOP_USER_DATA);
@@ -202,6 +213,77 @@ function getBuildPackageDesktopConfig() {
   };
 }
 
+const SAVED_PHONE_ACCOUNT_KEYS = [
+  "Server",
+  "Port",
+  "ServerPath",
+  "Domain",
+  "Username",
+  "PasswordType",
+  "profileName",
+];
+
+/** Non-empty saved account fields from userData config (never includes Password). */
+function readSavedPhoneAccount() {
+  const userConfig = readJsonFile(getUserConfigPath()) || {};
+  const phone =
+    userConfig.phone && typeof userConfig.phone === "object" ? userConfig.phone : {};
+  const out = {};
+  for (const key of SAVED_PHONE_ACCOUNT_KEYS) {
+    if (phone[key] === undefined || phone[key] === null) continue;
+    const value = String(phone[key]).trim();
+    if (!value) continue;
+    out[key] = value;
+  }
+  return out;
+}
+
+/** Persist SIP provisioning to userData/config.json (password stays in OS secret storage). */
+function savePhoneAccount(account = {}) {
+  const userPath = getUserConfigPath();
+  const existing = readJsonFile(userPath) || { mount: {}, phone: {} };
+  const phone = Object.assign({}, existing.phone || {});
+  const source = account && typeof account === "object" ? account : {};
+  for (const key of SAVED_PHONE_ACCOUNT_KEYS) {
+    if (source[key] === undefined || source[key] === null) continue;
+    const value = String(source[key]).trim();
+    if (value) phone[key] = value;
+    else delete phone[key];
+  }
+  delete phone.Password;
+  delete phone.SipPassword;
+  const next = {
+    mount: Object.assign({}, existing.mount || {}),
+    phone,
+  };
+  fs.mkdirSync(path.dirname(userPath), { recursive: true });
+  fs.writeFileSync(userPath, JSON.stringify(next, null, 2), "utf8");
+  writeLog("info", "Saved phone account to user config", {
+    path: userPath,
+    keys: Object.keys(phone),
+  });
+  return { ok: true, path: userPath };
+}
+
+function clearPhoneAccount() {
+  const userPath = getUserConfigPath();
+  const existing = readJsonFile(userPath) || { mount: {}, phone: {} };
+  const phone = Object.assign({}, existing.phone || {});
+  for (const key of SAVED_PHONE_ACCOUNT_KEYS) {
+    delete phone[key];
+  }
+  delete phone.Password;
+  delete phone.SipPassword;
+  const next = {
+    mount: Object.assign({}, existing.mount || {}),
+    phone,
+  };
+  fs.mkdirSync(path.dirname(userPath), { recursive: true });
+  fs.writeFileSync(userPath, JSON.stringify(next, null, 2), "utf8");
+  writeLog("info", "Cleared phone account from user config", { path: userPath });
+  return { ok: true, path: userPath };
+}
+
 function loadDesktopConfig() {
   const bundledConfig = readJsonFile(configPath) || { mount: {}, phone: {} };
   const startupConfigCandidates = getStartupConfigPathCandidates();
@@ -231,6 +313,7 @@ function loadDesktopConfig() {
   }
 
   const buildConfig = getBuildPackageDesktopConfig();
+  const savedAccount = readSavedPhoneAccount();
   const baseConfig = {
     mount: Object.assign({}, buildConfig.mount || {}),
     phone: Object.assign(
@@ -238,12 +321,16 @@ function loadDesktopConfig() {
       bundledConfig.phone || {},
       buildConfig.phone || {},
       startupConfig.phone || {},
+      // UI-saved account always wins over blank bundled/dev config.json.
+      savedAccount,
     ),
   };
   const merged = mergeConfig(baseConfig, {});
   writeLog("info", "Desktop config loaded", sanitizeConfigForLog(merged));
   writeLog("info", "Desktop config sources", {
     selected: selectedConfigPath,
+    userConfig: getUserConfigPath(),
+    savedAccountKeys: Object.keys(savedAccount),
     candidates: startupConfigCandidates,
   });
   return merged;
@@ -279,19 +366,73 @@ function resolveDesktopIconPath(config, keyName, defaultRelativePath) {
   if (!selected) selected = defaultRelativePath || "icons/win/icon.ico";
   if (path.isAbsolute(selected)) return selected;
 
+  // Packaged sidecar next to VPhone.exe (extraFiles) — most reliable for taskbar.
+  try {
+    const sidecar = path.join(path.dirname(process.execPath), "VPhone.ico");
+    if (app.isPackaged && fs.existsSync(sidecar)) return sidecar;
+  } catch {
+    // ignore
+  }
+
+  // Prefer asarUnpack path — native Windows icon APIs often fail inside app.asar.
+  const unpackedCandidate = path.join(
+    process.resourcesPath || "",
+    "app.asar.unpacked",
+    selected,
+  );
+  if (process.resourcesPath && fs.existsSync(unpackedCandidate)) {
+    return unpackedCandidate;
+  }
+
   const appDirCandidate = path.join(__dirname, selected);
   if (fs.existsSync(appDirCandidate)) return appDirCandidate;
 
   const assetRootCandidate = path.join(getAssetRoot(), selected);
   if (fs.existsSync(assetRootCandidate)) return assetRootCandidate;
 
+  const fallbackUnpacked = path.join(
+    process.resourcesPath || "",
+    "app.asar.unpacked",
+    "icons",
+    "win",
+    "icon.ico",
+  );
+  if (process.resourcesPath && fs.existsSync(fallbackUnpacked)) {
+    return fallbackUnpacked;
+  }
+
   return path.join(__dirname, "icons", "win", "icon.ico");
 }
+
+/** NativeImage for BrowserWindow/Tray — path-only often falls back to Electron icon on Windows. */
+function loadDesktopIconImage(iconPath) {
+  if (!iconPath) return undefined;
+  try {
+    if (fs.existsSync(iconPath)) {
+      let image = nativeImage.createFromPath(iconPath);
+      if (image.isEmpty()) {
+        image = nativeImage.createFromBuffer(fs.readFileSync(iconPath));
+      }
+      if (!image.isEmpty()) return image;
+    }
+  } catch (error) {
+    writeLog("warn", "Failed to load desktop icon", {
+      iconPath,
+      error: String(error),
+    });
+  }
+  return iconPath;
+}
+
 function getDesktopWindowIcon(config) {
-  return resolveDesktopIconPath(config, "windowIcon", "icons/win/icon.ico");
+  return loadDesktopIconImage(
+    resolveDesktopIconPath(config, "windowIcon", "icons/win/icon.ico"),
+  );
 }
 function getDesktopTrayIcon(config) {
-  return resolveDesktopIconPath(config, "trayIcon", "icons/win/icon.ico");
+  return loadDesktopIconImage(
+    resolveDesktopIconPath(config, "trayIcon", "icons/win/icon.ico"),
+  );
 }
 
 function normalizeKeyboardShortcutValue(value, fallback) {
@@ -330,14 +471,228 @@ function parseGlobalShortcutConfig(value) {
 
 function sendShortcutActionToRenderer(action) {
   if (!mainWindow || mainWindow.isDestroyed()) return false;
+  const name = String(action || "");
+  if (!name) return false;
+  const now = Date.now();
+  // Local before-input-event and globalShortcut can both fire after a focus steal.
+  if (
+    name === lastShortcutAction &&
+    now - lastShortcutAt < SHORTCUT_DEBOUNCE_MS
+  ) {
+    return false;
+  }
   if (mainWindow.webContents && !mainWindow.webContents.isDestroyed()) {
+    lastShortcutAction = name;
+    lastShortcutAt = now;
     mainWindow.webContents.send("vphone-desktop:shortcut-action", {
-      action,
+      action: name,
     });
     return true;
   }
 
   return false;
+}
+
+function hwndFromNativeHandle(handleBuffer) {
+  if (!handleBuffer || !Buffer.isBuffer(handleBuffer) || handleBuffer.length < 4) {
+    return 0n;
+  }
+  return handleBuffer.length >= 8
+    ? handleBuffer.readBigUInt64LE(0)
+    : BigInt(handleBuffer.readUInt32LE(0));
+}
+
+let winIconHelperPath = "";
+let win32FocusApi = null;
+
+function getPackagedSidecarIconPath() {
+  try {
+    const sidecar = path.join(path.dirname(process.execPath), "VPhone.ico");
+    if (fs.existsSync(sidecar)) return sidecar;
+  } catch {
+    // ignore
+  }
+  return "";
+}
+
+let nativeWindowIconApplied = false;
+let nativeWindowIconInFlight = false;
+
+function ensureWinIconHelperPath() {
+  if (winIconHelperPath && fs.existsSync(winIconHelperPath)) return winIconHelperPath;
+  const target = path.join(app.getPath("temp"), "vphone-set-window-icon.ps1");
+  const script = [
+    "param([Int64]$Hwnd, [string]$IconPath)",
+    "if (-not ([System.Management.Automation.PSTypeName]'VPhoneWinIcon').Type) {",
+    "  Add-Type -TypeDefinition @'",
+    "using System;",
+    "using System.Runtime.InteropServices;",
+    "public class VPhoneWinIcon {",
+    "  public const int WM_SETICON = 0x0080;",
+    "  public const int ICON_SMALL = 0;",
+    "  public const int ICON_BIG = 1;",
+    "  public const uint IMAGE_ICON = 1;",
+    "  public const uint LR_LOADFROMFILE = 0x0010;",
+    "  [DllImport(\"user32.dll\", CharSet=CharSet.Unicode)] public static extern IntPtr LoadImage(IntPtr hInst, string name, uint type, int cx, int cy, uint fuLoad);",
+    "  [DllImport(\"user32.dll\")] public static extern IntPtr SendMessage(IntPtr hWnd, int Msg, IntPtr wParam, IntPtr lParam);",
+    "  [DllImport(\"user32.dll\")] public static extern bool DestroyIcon(IntPtr hIcon);",
+    "}",
+    "'@",
+    "}",
+    "$h = [IntPtr]$Hwnd",
+    "$big = [VPhoneWinIcon]::LoadImage([IntPtr]::Zero, $IconPath, [VPhoneWinIcon]::IMAGE_ICON, 32, 32, [VPhoneWinIcon]::LR_LOADFROMFILE)",
+    "$small = [VPhoneWinIcon]::LoadImage([IntPtr]::Zero, $IconPath, [VPhoneWinIcon]::IMAGE_ICON, 16, 16, [VPhoneWinIcon]::LR_LOADFROMFILE)",
+    "if ($big -ne [IntPtr]::Zero) { [void][VPhoneWinIcon]::SendMessage($h, [VPhoneWinIcon]::WM_SETICON, [IntPtr][VPhoneWinIcon]::ICON_BIG, $big) }",
+    "if ($small -ne [IntPtr]::Zero) { [void][VPhoneWinIcon]::SendMessage($h, [VPhoneWinIcon]::WM_SETICON, [IntPtr][VPhoneWinIcon]::ICON_SMALL, $small) }",
+    "if (($big -ne [IntPtr]::Zero) -or ($small -ne [IntPtr]::Zero)) { '1' } else { '0' }",
+  ].join("\r\n");
+  fs.writeFileSync(target, script, "utf8");
+  winIconHelperPath = target;
+  return winIconHelperPath;
+}
+
+/**
+ * Force WM_SETICON on the HWND — needed for transparent frameless windows on Windows.
+ * Must stay async: spawning PowerShell with execFileSync blocked startup ~0.5s per call.
+ */
+function forceWindowIconWin32(browserWindow, iconPath) {
+  if (process.platform !== "win32") return;
+  if (!browserWindow || browserWindow.isDestroyed()) return;
+  if (nativeWindowIconApplied || nativeWindowIconInFlight) return;
+  const ico = String(iconPath || getPackagedSidecarIconPath() || "").trim();
+  if (!ico || !fs.existsSync(ico)) return;
+  let hwnd;
+  try {
+    hwnd = hwndFromNativeHandle(browserWindow.getNativeWindowHandle());
+  } catch (error) {
+    writeLog("warn", "forceWindowIconWin32 hwnd failed", { error: String(error) });
+    return;
+  }
+  if (!hwnd) return;
+
+  nativeWindowIconInFlight = true;
+  const helper = ensureWinIconHelperPath();
+  const { execFile } = require("node:child_process");
+  execFile(
+    "powershell.exe",
+    [
+      "-NoProfile",
+      "-NonInteractive",
+      "-WindowStyle",
+      "Hidden",
+      "-ExecutionPolicy",
+      "Bypass",
+      "-File",
+      helper,
+      "-Hwnd",
+      hwnd.toString(),
+      "-IconPath",
+      ico,
+    ],
+    { timeout: 2500, windowsHide: true, encoding: "utf8" },
+    (error, stdout) => {
+      nativeWindowIconInFlight = false;
+      if (error) {
+        writeLog("warn", "forceWindowIconWin32 failed", { error: String(error) });
+        return;
+      }
+      if (String(stdout || "").trim().endsWith("1")) {
+        nativeWindowIconApplied = true;
+      }
+    },
+  );
+}
+
+function applyDesktopWindowIcon(browserWindow, desktopConfig, options = {}) {
+  if (!browserWindow || browserWindow.isDestroyed()) return;
+  const windowIcon = getDesktopWindowIcon(desktopConfig);
+  if (windowIcon) {
+    try {
+      browserWindow.setIcon(windowIcon);
+    } catch (error) {
+      writeLog("warn", "Failed to set window icon", { error: String(error) });
+    }
+  }
+  const sidecar = getPackagedSidecarIconPath();
+  if (sidecar) {
+    try {
+      browserWindow.setIcon(sidecar);
+    } catch {
+      // ignore
+    }
+  }
+  // Native WM_SETICON only once after the window exists — never block create/load.
+  if (options && options.native) {
+    forceWindowIconWin32(browserWindow, sidecar);
+  }
+}
+
+function asHwnd(value) {
+  if (typeof value === "bigint") return value;
+  if (typeof value === "number" && Number.isFinite(value)) return BigInt(value);
+  return 0n;
+}
+
+/** In-process user32/kernel32. Spawning powershell.exe timed out (~2.5s) under load. */
+function getWin32FocusApi() {
+  if (win32FocusApi) return win32FocusApi;
+  const koffi = require("koffi");
+  const user32 = koffi.load("user32.dll");
+  const kernel32 = koffi.load("kernel32.dll");
+  win32FocusApi = {
+    SetForegroundWindow: user32.func("bool __stdcall SetForegroundWindow(intptr hWnd)"),
+    BringWindowToTop: user32.func("bool __stdcall BringWindowToTop(intptr hWnd)"),
+    ShowWindow: user32.func("bool __stdcall ShowWindow(intptr hWnd, int nCmdShow)"),
+    GetForegroundWindow: user32.func("intptr __stdcall GetForegroundWindow()"),
+    SetFocus: user32.func("intptr __stdcall SetFocus(intptr hWnd)"),
+    GetWindowThreadProcessId: user32.func(
+      "uint32_t __stdcall GetWindowThreadProcessId(intptr hWnd, intptr lpdwProcessId)",
+    ),
+    AttachThreadInput: user32.func(
+      "bool __stdcall AttachThreadInput(uint32_t idAttach, uint32_t idAttachTo, bool fAttach)",
+    ),
+    keybd_event: user32.func(
+      "void __stdcall keybd_event(uint8_t bVk, uint8_t bScan, uint32_t dwFlags, uintptr_t dwExtraInfo)",
+    ),
+    GetCurrentThreadId: kernel32.func("uint32_t __stdcall GetCurrentThreadId()"),
+  };
+  return win32FocusApi;
+}
+
+/**
+ * Windows blocks SetForegroundWindow for background processes. Use AttachThreadInput
+ * + SetForegroundWindow so incoming-call / tray restore get real keyboard focus —
+ * Electron focus() alone often only raises always-on-top without input.
+ */
+function forceForegroundWin32(browserWindow) {
+  if (process.platform !== "win32") return false;
+  if (!browserWindow || browserWindow.isDestroyed()) return false;
+  try {
+    const hwnd = hwndFromNativeHandle(browserWindow.getNativeWindowHandle());
+    if (!hwnd) return false;
+    const api = getWin32FocusApi();
+    const fg = asHwnd(api.GetForegroundWindow());
+    if (fg === hwnd) return true;
+
+    // Alt key tap lets a background process call SetForegroundWindow.
+    api.keybd_event(0x12, 0, 1, 0);
+    api.keybd_event(0x12, 0, 3, 0);
+
+    const fgThread = api.GetWindowThreadProcessId(fg, 0) >>> 0;
+    const cur = api.GetCurrentThreadId() >>> 0;
+    const attached = fgThread !== 0 && fgThread !== cur
+      ? !!api.AttachThreadInput(cur, fgThread, true)
+      : false;
+    api.ShowWindow(hwnd, 9);
+    api.BringWindowToTop(hwnd);
+    api.SetForegroundWindow(hwnd);
+    api.SetFocus(hwnd);
+    if (attached) api.AttachThreadInput(cur, fgThread, false);
+    return asHwnd(api.GetForegroundWindow()) === hwnd;
+  } catch (error) {
+    writeLog("warn", "forceForegroundWin32 failed", { error: String(error) });
+    return false;
+  }
 }
 
 function matchesAccelerator(input, accelerator) {
@@ -440,6 +795,7 @@ function createWindow(desktopConfig) {
   // Slightly larger than phoneFrame250 (250x425) + titlebar so keypad/settings fit fully
   const windowWidth = 270;
   const windowHeight = 485;
+  const windowIcon = getDesktopWindowIcon(desktopConfig);
   mainWindow = new BrowserWindow({
     width: windowWidth,
     height: windowHeight,
@@ -459,7 +815,7 @@ function createWindow(desktopConfig) {
     hasShadow: true,
     thickFrame: false,
     title: appTitle,
-    icon: getDesktopWindowIcon(desktopConfig),
+    icon: windowIcon,
     useContentSize: true,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
@@ -467,6 +823,16 @@ function createWindow(desktopConfig) {
       nodeIntegration: false,
       sandbox: false,
     },
+  });
+
+  // setIcon is cheap; WM_SETICON via PowerShell is deferred once (async) so
+  // create/loadFile are not blocked by ~0.5s+ powershell.exe cold starts.
+  applyDesktopWindowIcon(mainWindow, desktopConfig);
+  mainWindow.once("ready-to-show", () => {
+    applyDesktopWindowIcon(mainWindow, desktopConfig, { native: true });
+  });
+  mainWindow.on("show", () => {
+    applyDesktopWindowIcon(mainWindow, desktopConfig);
   });
 
   mainWindow.removeMenu();
@@ -607,6 +973,8 @@ function createWindow(desktopConfig) {
   });
 
   mainWindow.on("closed", () => {
+    nativeWindowIconApplied = false;
+    nativeWindowIconInFlight = false;
     mainWindow = null;
   });
 }
@@ -709,10 +1077,11 @@ function focusMainWindow(reason) {
   try {
     const focusReason = typeof reason === "string" ? reason : "manual";
     const isIncomingCall = focusReason === "incoming-call";
-    const maxAttempts = isIncomingCall ? 5 : 1;
+    const maxAttempts = isIncomingCall ? 3 : 2;
     let attempt = 0;
+    let lastOsFocused = false;
 
-    const applyFocus = () => {
+    const applyFocus = (useWin32) => {
       if (!mainWindow || mainWindow.isDestroyed()) return false;
       if (mainWindow.isMinimized()) {
         mainWindow.restore();
@@ -725,27 +1094,45 @@ function focusMainWindow(reason) {
       }
       mainWindow.setAlwaysOnTop(true, "screen-saver");
       app.focus({ steal: true });
-      mainWindow.focus();
-      mainWindow.moveTop();
       mainWindow.show();
+      mainWindow.moveTop();
+      mainWindow.focus();
+      if (useWin32) {
+        lastOsFocused = forceForegroundWin32(mainWindow);
+      }
       if (mainWindow.webContents && !mainWindow.webContents.isDestroyed()) {
         mainWindow.webContents.focus();
       }
-      return mainWindow.isFocused();
+      return lastOsFocused;
     };
 
     const finalizeFocus = () => {
       if (!mainWindow || mainWindow.isDestroyed()) return;
-      const stillFocused = mainWindow.isFocused();
-      if (!stillFocused) {
+      if (!lastOsFocused) {
+        lastOsFocused = forceForegroundWin32(mainWindow);
+      }
+      const osFocused = lastOsFocused;
+      const stillFocused = osFocused || mainWindow.isFocused();
+      if (!osFocused) {
         mainWindow.flashFrame(true);
       } else {
         mainWindow.flashFrame(false);
       }
-      mainWindow.setAlwaysOnTop(false);
+      if (osFocused) {
+        mainWindow.setAlwaysOnTop(false);
+      } else {
+        setTimeout(() => {
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.setAlwaysOnTop(false);
+          }
+        }, isIncomingCall ? 4000 : 1200);
+      }
+      // Ensure call hotkeys are armed even when Windows denied keyboard focus.
+      syncGlobalHotkeys();
       writeLog("info", "Desktop window focus attempt finished", {
         reason: focusReason,
         focused: stillFocused,
+        osForeground: osFocused,
         visible: mainWindow.isVisible(),
         minimized: mainWindow.isMinimized(),
       });
@@ -753,13 +1140,13 @@ function focusMainWindow(reason) {
 
     const focusWithRetry = () => {
       attempt += 1;
-      const focused = applyFocus();
-      if (focused || attempt >= maxAttempts) {
-        const releaseDelay = isIncomingCall ? 1400 : 250;
-        setTimeout(finalizeFocus, releaseDelay);
+      const isLast = attempt >= maxAttempts;
+      applyFocus(isLast);
+      if (isLast || lastOsFocused) {
+        setTimeout(finalizeFocus, isIncomingCall ? 120 : 60);
         return;
       }
-      setTimeout(focusWithRetry, isIncomingCall ? 180 : 140);
+      setTimeout(focusWithRetry, isIncomingCall ? 140 : 100);
     };
 
     focusWithRetry();
@@ -798,6 +1185,10 @@ app.whenReady().then(() => {
   configurePermissions();
 
   ipcMain.handle("vphone-desktop:get-config", () => loadDesktopConfig());
+  ipcMain.handle("vphone-desktop:save-phone-account", (_event, account) =>
+    savePhoneAccount(account),
+  );
+  ipcMain.handle("vphone-desktop:clear-phone-account", () => clearPhoneAccount());
   ipcMain.handle("vphone-desktop:is-dev", () => isDesktopDevMode());
   ipcMain.handle("vphone-desktop:secret-available", () => {
     try {
@@ -888,22 +1279,7 @@ function registerGlobalCallShortcut(accelerator, action) {
   }
 }
 
-function syncGlobalHotkeys() {
-  try {
-    globalShortcut.unregisterAll();
-  } catch (error) {
-    writeLog("warn", "Failed to unregister global shortcuts", { error: String(error) });
-  }
-
-  const windowFocused = !!(
-    mainWindow &&
-    !mainWindow.isDestroyed() &&
-    mainWindow.isFocused()
-  );
-  // Local key handlers cover the focused window; register OS-level hotkeys only
-  // when a call is active and the desktop window does not have focus.
-  if (windowFocused || callPhase === "idle") return;
-
+function registerActiveCallHotkeys() {
   const shortcuts = cachedShortcutConfig || parseGlobalShortcutConfig(null);
   if (callPhase === "incoming") {
     registerGlobalCallShortcut(shortcuts.answer, "answer");
@@ -917,6 +1293,20 @@ function syncGlobalHotkeys() {
     registerGlobalCallShortcut(shortcuts.mute, "mute");
     registerGlobalCallShortcut(shortcuts.transfer, "transfer");
   }
+}
+
+function syncGlobalHotkeys() {
+  try {
+    globalShortcut.unregisterAll();
+  } catch (error) {
+    writeLog("warn", "Failed to unregister global shortcuts", { error: String(error) });
+  }
+
+  // Always arm OS hotkeys during a call. Windows often shows the window on top
+  // (alwaysOnTop) while denying real keyboard focus, so local before-input-event
+  // never sees keys — and Electron's isFocused() can still report true.
+  if (callPhase === "idle") return;
+  registerActiveCallHotkeys();
 }
 
 app.on("before-quit", () => {

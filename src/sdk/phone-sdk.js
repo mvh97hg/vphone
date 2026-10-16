@@ -81,28 +81,35 @@ export async function resolveStoredSipPassword(raw) {
 }
 
 /**
- * Persist Password only when Electron safeStorage is available.
- * Web embed keeps secrets in memory only (never write Password to localStorage).
+ * Persist Password when Electron is available.
+ * Prefer OS safeStorage; if encryption is unavailable, keep a desktop localStorage
+ * fallback so restarts still restore the account (web embed never stores secrets).
  */
 export async function persistSipPassword(plain) {
   if (typeof window === "undefined" || !window.localStorage) return false;
   const value = String(plain ?? "");
-
-  if (!(await isSecretStorageAvailable())) {
-    // Web / no OS vault: clear any legacy Password key; do not store secrets.
-    if (!value) writeStorageValue("Password", "");
-    return false;
-  }
+  const desktop = !!desktopSecretApi();
 
   if (!value) {
     writeStorageValue("Password", "");
+    return desktop;
+  }
+
+  if (await isSecretStorageAvailable()) {
+    const api = desktopSecretApi();
+    const cipher = await api.encryptSecret(value);
+    writeStorageValue("Password", `${SECRET_STORAGE_PREFIX}${cipher}`);
     return true;
   }
 
-  const api = desktopSecretApi();
-  const cipher = await api.encryptSecret(value);
-  writeStorageValue("Password", `${SECRET_STORAGE_PREFIX}${cipher}`);
-  return true;
+  if (desktop) {
+    // Encryption unavailable (rare) — still persist so Electron restarts keep working.
+    writeStorageValue("Password", value);
+    return true;
+  }
+
+  // Web embed: memory only.
+  return false;
 }
 
 /** SIP provisioning keys — host/memory owned on web; not reloaded from localStorage. */
@@ -113,7 +120,8 @@ const WEB_MEMORY_ONLY_KEYS = new Set([
   "Server",
   "Port",
   "Domain",
-  "ServerPath"
+  "ServerPath",
+  "profileName"
 ]);
 
 function configFromStorage() {
@@ -131,9 +139,26 @@ function configFromStorage() {
   return config;
 }
 
+/** Host config wins only when it provides a non-empty value; else keep storage. */
+function mergeHostAndStorageConfig(hostConfig = {}) {
+  const stored = configFromStorage();
+  const host = hostConfig && typeof hostConfig === "object" ? { ...hostConfig } : {};
+  const merged = { ...stored, ...host };
+  if (desktopSecretApi()) {
+    for (const key of STORAGE_KEYS) {
+      if (key === "Password") continue;
+      const fromStore = stored[key];
+      const fromHost = host[key];
+      const hostEmpty = fromHost === undefined || fromHost === null || String(fromHost).trim() === "";
+      if (fromStore && hostEmpty) merged[key] = fromStore;
+    }
+  }
+  return normalizePhoneConfig(merged);
+}
+
 export class PhoneSDK {
   constructor(config = {}, deps = {}) {
-    const mergedConfig = normalizePhoneConfig({ ...configFromStorage(), ...(config || {}) });
+    const mergedConfig = mergeHostAndStorageConfig(config || {});
     if (isEncryptedSecret(mergedConfig.Password)) delete mergedConfig.Password;
     this.core = deps.core || new PhoneCore(mergedConfig, deps);
     this._tabLeaderController = null;
@@ -160,7 +185,8 @@ export class PhoneSDK {
     const configPassword = configValue && !isEncryptedSecret(configValue) ? String(configValue) : "";
     let storageValue = "";
     let storedType = null;
-    if (!configPassword && (await isSecretStorageAvailable())) {
+    // Electron: load vaulted/plaintext Password from localStorage when memory is empty.
+    if (!configPassword && desktopSecretApi()) {
       const raw = readStorageValue("Password") || null;
       storageValue = raw ? await resolveStoredSipPassword(raw) : "";
       storedType = readStorageValue("PasswordType") || null;

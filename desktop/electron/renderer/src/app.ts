@@ -2,6 +2,8 @@ import { createPhoneWidget } from "../../../../src/ui/phone-widget.js";
 
 type DesktopBridge = {
   getConfig: () => Promise<any>;
+  savePhoneAccount?: (account: Record<string, string>) => Promise<unknown>;
+  clearPhoneAccount?: () => Promise<unknown>;
   isDevMode?: () => Promise<boolean>;
   requestMediaAccess?: () => Promise<any>;
   getDiagnostics?: () => Promise<any>;

@@ -16,8 +16,7 @@ export const PHONE_CONFIG_DEFAULTS = Object.freeze({
   EnableBuddies: true,
   EnableMultiTabLeader: true,
   ServerPath: "/ws",
-  MaxDidLength: 24,
-  HoldMode: "sip"
+  MaxDidLength: 24
 });
 
 /** Fixed floating/inline panel size — matches UI phoneFrame250. */
@@ -62,7 +61,8 @@ const REMOVED_KEYS = Object.freeze([
   "DisableBuddies",
   "multiTabLeader",
   "serverPath",
-  "WSSPATH"
+  "WSSPATH",
+  "HoldMode"
 ]);
 
 /**

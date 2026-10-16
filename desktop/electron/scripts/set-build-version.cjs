@@ -33,11 +33,24 @@ function main() {
 
   pkg.version = semverVersion;
   pkg.build = pkg.build || {};
-  pkg.build.artifactName = `${pkg.build.productName || "VPhone"} Setup ${displayVersion}.${"${ext}"}`;
+  // Unique staging under release/ per build (no separate dist/).
+  // finalize renames win-unpacked -> release/VPhone-<ver>-win.
+  pkg.build.directories = pkg.build.directories || {};
+  pkg.build.directories.output = `release/_pack-${displayVersion}`;
+  pkg.build.directories.buildResources =
+    pkg.build.directories.buildResources || "build";
+  pkg.build.artifactName = `VPhone-${displayVersion}.\${ext}`;
+  pkg.build.nsis = pkg.build.nsis || {};
+  pkg.build.nsis.artifactName = `VPhone-Setup-${displayVersion}.\${ext}`;
+  pkg.build.portable = pkg.build.portable || {};
+  pkg.build.portable.artifactName = `VPhone-${displayVersion}-win`;
 
   fs.writeFileSync(packageJsonPath, `${JSON.stringify(pkg, null, 2)}\n`, "utf8");
   console.log(`[set-build-version] app version: ${semverVersion}`);
   console.log(`[set-build-version] artifact version: ${displayVersion}`);
+  console.log(
+    `[set-build-version] pack staging: ${pkg.build.directories.output}`
+  );
 }
 
 main();

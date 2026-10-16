@@ -2,6 +2,8 @@
 var { contextBridge, ipcRenderer } = require("electron");
 contextBridge.exposeInMainWorld("VPhoneDesktop", {
   getConfig: () => ipcRenderer.invoke("vphone-desktop:get-config"),
+  savePhoneAccount: (account) => ipcRenderer.invoke("vphone-desktop:save-phone-account", account),
+  clearPhoneAccount: () => ipcRenderer.invoke("vphone-desktop:clear-phone-account"),
   isDevMode: () => ipcRenderer.invoke("vphone-desktop:is-dev"),
   requestMediaAccess: () => ipcRenderer.invoke("vphone-desktop:request-media-access"),
   getDiagnostics: () => ipcRenderer.invoke("vphone-desktop:get-diagnostics"),

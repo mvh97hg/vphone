@@ -129,9 +129,8 @@ Common config:
       "mute": "Alt+M",
       "transfer": "Alt+T"
     },
-    "IceStunServerJson": "",
-    "IceStunCheckTimeout": 500,
-    "HoldMode": "sip",
+    "IceStunServerJson": "[]",
+    "IceStunCheckTimeout": 0,
     "HoldIceRestart": false
   }
 }
@@ -158,14 +157,28 @@ All icon fields accept:
 - absolute filesystem path
 - URL/data URI (for web icon fields)
 
-The default example intentionally leaves SIP credentials blank so the app opens the UI first. Use the `...` settings menu inside the phone panel to enter extension details, or edit `config.json` before launching. The embedded phone uses the same SIP WebSocket reconnect loop as the web app; `TransportReconnectionAttempts` and `TransportReconnectionTimeout` control retry count and interval.
+The default example intentionally leaves SIP credentials blank so the app opens the UI first. Use the `...` settings menu inside the phone panel to enter extension details, or edit `config.json` before launching. The embedded phone uses the same SIP WebSocket reconnect loop as the web app:
 
-Hold behavior:
+- `TransportKeepAliveInterval` (seconds, default `15`): CRLF keepalive so half-open WSS after a server restart is detected. `0` disables.
+- `TransportReconnectionAttempts` (default `10`): automatic reconnect count after transport drop.
+- `TransportReconnectionTimeout` (seconds, default `4`): delay between reconnect attempts.
 
-- `phone.HoldMode` (`sip` default):
-  - `sip` — standards re-INVITE hold (`a=sendonly` / resume `a=sendrecv`) so the PBX can play MOH and run hold-related dialplan.
-  - `local` — mute tracks only (no SIP signaling); PBX will not see hold.
-- `phone.HoldIceRestart` (`false` default): keep `false` (legacy). `true` + rtpengine `ICE=force` commonly causes Role conflict / bad ICE username / DTLS close.
+After a new socket connects, VPhone re-REGISTERs so inbound INVITEs resume. Manual register while not registered always recycles the transport (disconnect then connect) because SIP.js `reconnect()` is a no-op when state is still `Connected`.
+
+Hold / ICE behavior:
+
+- Hold is always SIP re-INVITE (`a=sendonly` / resume `a=sendrecv`) so the PBX can play MOH — no client-only mute mode.
+- `phone.HoldIceRestart` (`false` default): keep `false`. `true` + rtpengine `ICE=force` → Role conflict / STUN `401 Unauthorized` (bad ICE username) / DTLS close.
+- `phone.IceStunCheckTimeout` (`0` default): wait until ICE gathering completes. Values like `500` truncate gathering and commonly cause STUN `401 Unauthorized` on the **first inbound hold**.
+- `phone.IceStunServerJson` (`"[]"` recommended with rtpengine `ICE=force`): disables browser default Google STUN. Blank omits the field (Chromium may still use public STUN). `"[]"` turns ICE servers off.
+
+Media server (rtpengine) notes for SIP hold from WebRTC:
+
+- On **every** offer/answer including hold re-INVITE toward the browser, keep stable WebRTC flags (example): `ICE=force DTLS-fingerprint=sha-256 RTP/SAVPF replace-session-connection replace-origin SDES-off`.
+- Do **not** add `reset` on hold/unhold re-INVITE (drops ICE attrs / forces bad renegotiation).
+- Do **not** force ICE restart from the client (`HoldIceRestart=false`).
+- Hold SDP must use `a=sendonly` / `a=inactive` — never `c=0.0.0.0` (that triggers ICE restart).
+- Prefer a recent rtpengine (≥12.5 or a build with the `setup=actpass` re-INVITE fix) so DTLS role stays correct when the browser was the original answerer.
 
 Password storage:
 
@@ -255,9 +268,15 @@ Windows installer behavior:
 - `npm run dist:nsis` tạo file `.exe` installer (wizard), có màn hình chọn ngôn ngữ (`Vietnamese`, `English`), mặc định là tiếng Việt.
 - Installer chạy theo user scope (`perMachine=false`), mặc định cài trong profile user (thường dưới `%LOCALAPPDATA%\\Programs`), và cho phép đổi thư mục cài.
 - `npm run dist:portable` tạo bản `.exe` portable để copy sang máy khác chạy trực tiếp (không cần cài).
-- File `.exe` (NSIS + portable) và icon installer/uninstaller dùng cùng icon `icons/win/icon.ico`.
+- Portable mặc định = thư mục unpacked (không tạo Setup / portable SFX). Chạy `pnpm dist:portable` → `release/VPhone-<version>-win/VPhone.exe`.
+- Icon: `icons/win/icon.ico` → `build/icon.ico`, stamp bằng `resedit` ở `afterPack` + `afterSign`.
+- Mỗi build portable → `release/VPhone-<version>-win/` (staging tạm `release/_pack-<version>/`). Không dùng `dist/`. Portable **không** xoá `VPhone-Setup-*.exe` đã có trong `release/`.
+- `pnpm dist:nsis` → `release/VPhone-Setup-<version>.exe` (cùng staging `_pack-*`, không tạo thêm folder portable; có thể xoá Setup bản cũ hơn).
+- NSIS uninstall GUID được pin (`nsis.guid`); installer `customInit` xóa ARP cũ của `com.vphone.app` để tránh hai mục “VPhone” trong Control Panel khi đổi AUMID/appId.
 
-Build output goes to `desktop/electron/release/`.
+Artifacts:
+- Portable: `desktop/electron/release/VPhone-<version>-win/`
+- NSIS: `desktop/electron/release/VPhone-Setup-<version>.exe`
 
 Sensitive config packaging note:
 

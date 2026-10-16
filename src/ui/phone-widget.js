@@ -112,7 +112,6 @@ const FALLBACK_TEXT = {
     registering: "Registering",
     online: "Online",
     offline: "Offline",
-    registerFailed: "Register failed",
     connected: "Connected",
     ended: "Ended",
     muted: "Muted",
@@ -241,7 +240,6 @@ const FALLBACK_TEXT = {
     registering: "Đang đăng ký",
     online: "Trực tuyến",
     offline: "Ngoại tuyến",
-    registerFailed: "Đăng ký thất bại",
     connected: "Đã kết nối",
     ended: "Đã kết thúc",
     muted: "Đã tắt tiếng",
@@ -771,7 +769,7 @@ export class PhoneUI {
     this._ringtoneFallbackTimer = null;
     this.language = this.#normalizeLanguage(this.#getDbItem("Language", this.config.Language || "vi"));
     this.langPack = {};
-    this.dialpadToggles = { auto: false, cw: true, dnd: false, rec: false };
+    this.dialpadToggles = this.#loadDialpadToggles();
     this.activeTab = "dialpad";
     this.tabSearch = { contacts: "", recents: "", dialpad: "" };
     this.callConnected = false;
@@ -839,6 +837,7 @@ export class PhoneUI {
     this.#bindTabButtons();
     this.#bindDialpadInputState();
     this.#bindDialpadDigits();
+    this.#bindDialpadTogglesSync();
     this.#bindSearchInputState();
     this.#bindRecentExpandedActions();
     this.#bindContactExpandedActions();
@@ -947,12 +946,11 @@ export class PhoneUI {
       if (mute) mute.style.display = muted ? "none" : "";
       if (unmute) unmute.style.display = muted ? "" : "none";
     });
-    this.sdk.on("hold-changed", ({ onHold }) => {
-      this.renderer.setStatus(onHold ? this.#t("onHold") : this.#t("resumed"));
-      const hold = this.root.querySelector("#line-1-btn-Hold");
-      const resume = this.root.querySelector("#line-1-btn-Unhold");
-      if (hold) hold.style.display = onHold ? "none" : "";
-      if (resume) resume.style.display = onHold ? "" : "none";
+    this.sdk.on("hold-changed", ({ onHold, pending } = {}) => {
+      this.#syncHoldButtons(!!onHold, !!pending);
+      if (!pending) {
+        this.renderer.setStatus(onHold ? this.#t("onHold") : this.#t("resumed"));
+      }
     });
     this.sdk.on("local-stream", (stream) => this.renderer.attachMedia("local", stream));
     this.sdk.on("remote-stream", (stream) => this.renderer.attachMedia("remote", stream));
@@ -1453,6 +1451,11 @@ export class PhoneUI {
         this.profileName = "";
         this.profileUserID = "default";
         try { await persistSipPassword(""); } catch { /* ignore */ }
+        try {
+          if (typeof window !== "undefined" && typeof window.VPhoneDesktop?.clearPhoneAccount === "function") {
+            await window.VPhoneDesktop.clearPhoneAccount();
+          }
+        } catch { /* ignore */ }
         try { await this.sdk.unregister?.(); } catch { /* ignore */ }
         try { this.sdk.configure?.(Object.fromEntries(keys.map((key) => [key, ""]))); } catch { /* ignore */ }
         this.renderer.setRegistrationState({
@@ -1468,8 +1471,10 @@ export class PhoneUI {
       message: this.#t("confirmResetSettings"),
       confirmText: this.#t("resetSettings"),
       onConfirm: async () => {
-        ["AudioOutputId", "AudioSrcId", "RingOutputId", "VideoSrcId", "Language", "NoiseSuppression", "EchoCancellation", "AutoGainControl"].forEach((key) => this.localDB?.removeItem(key));
+        ["AudioOutputId", "AudioSrcId", "RingOutputId", "VideoSrcId", "Language", "NoiseSuppression", "EchoCancellation", "AutoGainControl", "DialpadToggles"].forEach((key) => this.localDB?.removeItem(key));
         this.language = this.#normalizeLanguage(this.config.Language || "vi");
+        this.dialpadToggles = this.#loadDialpadToggles();
+        this.#applyDialpadTogglesUi();
         this.#applySavedAudioPreferences();
         await this.#loadLanguagePack(this.language);
         await this.#renderConfigExtension("settings");
@@ -1506,13 +1511,42 @@ export class PhoneUI {
         Password: storedAuth.password,
         PasswordType: storedAuth.type
       });
-      // Do not write SIP auth/provisioning keys to localStorage (host/memory model).
       Object.assign(this.config, nextConfig);
       this.profileName = nextConfig.profileName || this.profileName;
       this.profileUserID = nextConfig.Username || this.profileUserID;
       try {
         this.localDB?.setItem("profileUserID", this.profileUserID);
       } catch {}
+      // Electron: persist SIP provisioning across restarts.
+      // - localStorage (+ OS safeStorage for password)
+      // - userData/config.json via savePhoneAccount (survives blank bundled config.json)
+      // Web embed: keep auth in memory only — host owns credentials.
+      if (typeof window !== "undefined" && window.VPhoneDesktop) {
+        const account = {
+          Server: nextConfig.Server || "",
+          Port: nextConfig.Port || "",
+          ServerPath: nextConfig.ServerPath || "",
+          Domain: nextConfig.Domain || "",
+          Username: nextConfig.Username || "",
+          PasswordType: nextConfig.PasswordType || "",
+          profileName: nextConfig.profileName || ""
+        };
+        for (const [key, value] of Object.entries(account)) {
+          writeStorageValue(key, value);
+        }
+        try {
+          await persistSipPassword(nextConfig.Password || "");
+        } catch {
+          // Non-fatal: in-memory config still applies for this session.
+        }
+        try {
+          if (typeof window.VPhoneDesktop.savePhoneAccount === "function") {
+            await window.VPhoneDesktop.savePhoneAccount(account);
+          }
+        } catch {
+          // Non-fatal: localStorage may still restore the session.
+        }
+      }
       try {
         await this.sdk.unregister?.();
         this.sdk.configure?.(nextConfig);
@@ -1566,9 +1600,37 @@ export class PhoneUI {
     await this.sdk.switchDevice(kind, deviceId);
   }
 
+  #syncHoldButtons(onHold, pending = false) {
+    const hold = this.root.querySelector("#line-1-btn-Hold");
+    const resume = this.root.querySelector("#line-1-btn-Unhold");
+    if (hold) {
+      hold.style.display = onHold ? "none" : "";
+      hold.disabled = !!pending;
+    }
+    if (resume) {
+      resume.style.display = onHold ? "" : "none";
+      resume.disabled = !!pending;
+    }
+  }
+
+  async #runHoldAction(action) {
+    if (this._holdUiBusy) return;
+    this._holdUiBusy = true;
+    this.#syncHoldButtons(!!this.sdk.isOnHold?.(), true);
+    try {
+      await action();
+    } catch (err) {
+      this.#syncHoldButtons(!!this.sdk.isOnHold?.(), false);
+      this.renderer.setStatus(`Hold failed: ${String(err?.message || err)}`);
+    } finally {
+      this._holdUiBusy = false;
+      this.#syncHoldButtons(!!this.sdk.isOnHold?.(), false);
+    }
+  }
+
   async toggleHold() {
-    if (this.sdk.isOnHold?.()) return this.sdk.resume();
-    return this.sdk.hold();
+    if (this.sdk.isOnHold?.()) return this.#runHoldAction(() => this.sdk.resume());
+    return this.#runHoldAction(() => this.sdk.hold());
   }
 
   async #reconnectLastCall() {
@@ -1880,15 +1942,11 @@ export class PhoneUI {
         return;
       }
       if (target.closest(".callHold")) {
-        void this.sdk.hold?.().catch((err) => {
-          this.renderer.setStatus(`Hold failed: ${String(err?.message || err)}`);
-        });
+        void this.#runHoldAction(() => this.sdk.hold?.());
         return;
       }
       if (target.closest(".callResume")) {
-        void this.sdk.resume?.().catch((err) => {
-          this.renderer.setStatus(`Resume failed: ${String(err?.message || err)}`);
-        });
+        void this.#runHoldAction(() => this.sdk.resume?.());
         return;
       }
       if (target.closest(".callTransfer")) {
@@ -2255,25 +2313,96 @@ export class PhoneUI {
     this.#switchTab(tab);
   }
 
-  #toggleDialpadSetting(key) {
-    if (!key || !(key in this.dialpadToggles)) return;
-    this.dialpadToggles[key] = !this.dialpadToggles[key];
-    const btn = this.root.querySelector(`#dialpad-toggle-${key}`);
-    if (btn) {
-      btn.classList.toggle("toggleOn", this.dialpadToggles[key]);
+  #defaultDialpadToggles() {
+    return { auto: false, cw: true, dnd: false, rec: false };
+  }
+
+  #loadDialpadToggles() {
+    const defaults = this.#defaultDialpadToggles();
+    const raw = this.#getDbItem("DialpadToggles", "");
+    if (!raw) return { ...defaults };
+    try {
+      const parsed = typeof raw === "string" ? JSON.parse(raw) : null;
+      if (!parsed || typeof parsed !== "object") return { ...defaults };
+      return {
+        auto: parsed.auto === true || parsed.auto === "1" || parsed.auto === 1,
+        cw: parsed.cw === undefined
+          ? defaults.cw
+          : !(parsed.cw === false || parsed.cw === "0" || parsed.cw === 0),
+        dnd: parsed.dnd === true || parsed.dnd === "1" || parsed.dnd === 1,
+        rec: parsed.rec === true || parsed.rec === "1" || parsed.rec === 1
+      };
+    } catch {
+      return { ...defaults };
+    }
+  }
+
+  #saveDialpadToggles() {
+    if (!this.localDB) return;
+    try {
+      this.localDB.setItem("DialpadToggles", JSON.stringify({
+        auto: !!this.dialpadToggles.auto,
+        cw: !!this.dialpadToggles.cw,
+        dnd: !!this.dialpadToggles.dnd,
+        rec: !!this.dialpadToggles.rec
+      }));
+    } catch {
+      // ignore quota / private mode
+    }
+  }
+
+  #applyDialpadTogglesUi({ announce = false, changedKey = "" } = {}) {
+    for (const key of Object.keys(this.dialpadToggles || {})) {
+      const btn = this.root?.querySelector?.(`#dialpad-toggle-${key}`);
+      if (!btn) continue;
+      btn.classList.toggle("toggleOn", !!this.dialpadToggles[key]);
       btn.classList.toggle("toggleOff", !this.dialpadToggles[key]);
     }
-    if (key === "dnd") {
-      this.renderer.dndActive = !!this.dialpadToggles.dnd;
-      const regState = this.sdk.getRegistrationState?.() || {};
+    this.renderer.dndActive = !!this.dialpadToggles.dnd;
+    const regState = this.sdk.getRegistrationState?.() || {};
+    if (regState.online) {
       this.renderer.setRegistrationState({
         ...regState,
         user: this.#registrationDisplayUser(regState.user)
       });
-      this.renderer.setStatus(this.dialpadToggles.dnd ? this.#t("doNotDisturb") : this.#t("online"));
-      return;
+      if (!this.#statusHoldActive()) {
+        this.renderer.setStatus(this.dialpadToggles.dnd ? this.#t("doNotDisturb") : this.#t("online"));
+      }
     }
-    this.renderer.setStatus(`${key.toUpperCase()} ${this.dialpadToggles[key] ? "On" : "Off"}`);
+    if (announce && changedKey && changedKey !== "dnd") {
+      this.renderer.setStatus(
+        `${changedKey.toUpperCase()} ${this.dialpadToggles[changedKey] ? "On" : "Off"}`
+      );
+    }
+  }
+
+  #bindDialpadTogglesSync() {
+    if (typeof window === "undefined" || this._dialpadTogglesSyncBound) return;
+    this._dialpadTogglesSyncBound = true;
+    this._onDialpadTogglesStorage = (event) => {
+      if (!event || event.storageArea !== this.localDB) return;
+      if (event.key != null && event.key !== "DialpadToggles") return;
+      const next = this.#loadDialpadToggles();
+      const prev = this.dialpadToggles || {};
+      if (
+        !!next.auto === !!prev.auto &&
+        !!next.cw === !!prev.cw &&
+        !!next.dnd === !!prev.dnd &&
+        !!next.rec === !!prev.rec
+      ) {
+        return;
+      }
+      this.dialpadToggles = next;
+      this.#applyDialpadTogglesUi();
+    };
+    window.addEventListener("storage", this._onDialpadTogglesStorage);
+  }
+
+  #toggleDialpadSetting(key) {
+    if (!key || !(key in this.dialpadToggles)) return;
+    this.dialpadToggles[key] = !this.dialpadToggles[key];
+    this.#saveDialpadToggles();
+    this.#applyDialpadTogglesUi({ announce: true, changedKey: key });
   }
 
   #bindDialpadInputState() {
@@ -3518,15 +3647,37 @@ export class PhoneUI {
       this.renderer.setStatus("Register toggle not supported");
       return;
     }
+    const applyState = (state = {}) => {
+      const displayUser = this.#registrationDisplayUser(state.user);
+      this.renderer.setRegistrationState({ ...state, user: displayUser });
+      if (this.#statusHoldActive()) return;
+      if (state.online) {
+        this.renderer.setStatus(this.dialpadToggles.dnd ? this.#t("doNotDisturb") : this.#t("online"));
+      } else if (state.status === "register-failed" || state.error) {
+        this.renderer.setStatus(String(state.error || this.#t("registerFailed")));
+      } else {
+        this.renderer.setStatus(this.#t("offline"));
+      }
+    };
     try {
-      const state = await this.sdk.toggleRegistration();
-      this.renderer.setRegistrationState({
-        ...(state || {}),
-        user: this.#registrationDisplayUser(state?.user)
-      });
-      this.renderer.setStatus(state?.online ? this.#t("online") : this.#t("offline"));
+      this.renderer.setStatus(this.#t("registering"));
+      const current = this.sdk.getRegistrationState?.() || {};
+      let state;
+      if (current.online) {
+        state = await this.sdk.unregister?.();
+      } else {
+        // Retry after register-failed / offline: hydrate secrets then register again.
+        try { await this.sdk.hydrateSecrets?.(); } catch { /* ignore */ }
+        state = await this.sdk.register?.();
+      }
+      applyState(state || this.sdk.getRegistrationState?.() || {});
     } catch (err) {
-      this.renderer.setStatus(`Register toggle failed: ${String(err?.message || err)}`);
+      const failed = this.sdk.getRegistrationState?.() || {
+        online: false,
+        status: "register-failed",
+        error: String(err?.message || err || this.#t("registerFailed"))
+      };
+      applyState(failed);
     }
   }
 }
@@ -3535,7 +3686,12 @@ export function createPhoneWidget({ root, config = {}, deps = {} } = {}) {
   const mountRoot = root || document.getElementById("Phone") || document.body;
   const normalizedConfig = normalizePhoneConfig(config);
   const sdk = deps.sdk || new PhoneSDK(normalizedConfig, deps);
-  const ui = new PhoneUI({ root: mountRoot, sdk, config: normalizedConfig, deps });
+  // PhoneSDK merges Electron localStorage; UI must use that merged config (not blank host file).
+  const uiConfig = normalizePhoneConfig({
+    ...normalizedConfig,
+    ...(sdk.core?.config && typeof sdk.core.config === "object" ? sdk.core.config : {})
+  });
+  const ui = new PhoneUI({ root: mountRoot, sdk, config: uiConfig, deps });
   ui.mount();
   sdk.bindAudioElements?.({
     remoteEl: mountRoot.querySelector("[data-role='remote-media']"),
@@ -3640,6 +3796,11 @@ export function createPhoneWidget({ root, config = {}, deps = {} } = {}) {
     try {
       const password = await sdk.hydrateSecrets?.();
       if (password) ui.config.Password = password;
+      // Keep UI fields in sync with SDK after storage/secret hydration.
+      if (sdk.core?.config && typeof sdk.core.config === "object") {
+        Object.assign(ui.config, sdk.core.config);
+        if (password) ui.config.Password = password;
+      }
     } catch {
       // Continue register even if secret hydration fails.
     }

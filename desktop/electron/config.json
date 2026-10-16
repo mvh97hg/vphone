@@ -33,9 +33,11 @@
       "mute": "Alt+M",
       "transfer": "Alt+T"
     },
-    "IceStunServerJson": "",
-    "IceStunCheckTimeout": 500,
-    "HoldMode": "sip",
-    "HoldIceRestart": false
+    "IceStunServerJson": "[]",
+    "IceStunCheckTimeout": 0,
+    "HoldIceRestart": false,
+    "TransportKeepAliveInterval": 15,
+    "TransportReconnectionAttempts": 10,
+    "TransportReconnectionTimeout": 4
   }
 }

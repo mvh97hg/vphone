@@ -1,4 +1,5 @@
 import { sipAuthorizationOptions } from "../sdk/sip-auth.js";
+import { getSipUserAgentString } from "../version.js";
 
 function buildWsUrl(config) {
   const host = config.Server || "";
@@ -342,9 +343,148 @@ export class PhoneCore extends EventEmitter {
     /** True only after an intentional unregister(); cleared on register(). */
     this._intentionallyUnregistered = false;
     this._registererWired = false;
+    /** Fingerprint of SIP identity bound into the current UserAgent (ws/user/domain/auth). */
+    this._uaBoundFingerprint = "";
+    /** True after the first successful transport connect for this UA. */
+    this._transportEverConnected = false;
+    this._reregisterAfterTransportInFlight = false;
     this._boundRemoteEl = null;
     this._boundLocalEl = null;
     this._bindMedia();
+  }
+
+  _uaFingerprint(config = this.config) {
+    const cfg = config || {};
+    return [
+      buildWsUrl(cfg),
+      String(cfg.Username || "").trim(),
+      resolveSipDomain(cfg),
+      String(cfg.Password || ""),
+      String(cfg.PasswordType || "").trim().toLowerCase()
+    ].join("|");
+  }
+
+  _transportKeepAliveIntervalSec() {
+    const raw = Number(this.config.TransportKeepAliveInterval);
+    // SIP.js default is 0 (disabled) — half-open WSS after server restart stays
+    // "Connected" forever. 15s CRLF keepalives detect dead sockets quickly.
+    if (!Number.isFinite(raw)) return 15;
+    if (raw < 0) return 0;
+    return raw;
+  }
+
+  _transportReconnectionAttempts() {
+    const raw = Number(this.config.TransportReconnectionAttempts);
+    if (!Number.isFinite(raw) || raw < 0) return 10;
+    return Math.floor(raw);
+  }
+
+  _transportReconnectionDelaySec() {
+    const raw = Number(this.config.TransportReconnectionTimeout);
+    if (!Number.isFinite(raw) || raw < 0) return 4;
+    return raw;
+  }
+
+  _buildTransportOptions(wsUrl, traceSip) {
+    return {
+      server: wsUrl,
+      traceSip: !!traceSip,
+      keepAliveInterval: this._transportKeepAliveIntervalSec(),
+      connectionTimeout: 5
+    };
+  }
+
+  _disposeUserAgent() {
+    if (this.userAgent) {
+      try { this.userAgent.stop?.(); } catch {}
+    }
+    this.userAgent = null;
+    this.registerer = null;
+    this._registererWired = false;
+    this._uaBoundFingerprint = "";
+    this._transportEverConnected = false;
+    this._reregisterAfterTransportInFlight = false;
+    this.isRegistered = false;
+  }
+
+  /**
+   * Half-open WSS after server restart still reports Connected; reconnect() is a
+   * no-op in that state. Disconnect first so the next connect opens a new socket.
+   */
+  async _recycleTransport() {
+    if (!this.userAgent) return;
+    try {
+      await this.userAgent.transport?.disconnect?.();
+    } catch {
+      // ignore
+    }
+    try {
+      await this.userAgent.reconnect();
+    } catch {
+      this._disposeUserAgent();
+    }
+  }
+
+  _wireTransportRecovery(username) {
+    if (!this.userAgent) return;
+    const prev = this.userAgent.delegate && typeof this.userAgent.delegate === "object"
+      ? this.userAgent.delegate
+      : {};
+    this.userAgent.delegate = {
+      ...prev,
+      onDisconnect: (error) => {
+        try { prev.onDisconnect?.(error); } catch { /* ignore */ }
+        this.isRegistered = false;
+        if (this._intentionallyUnregistered) return;
+        const message = error
+          ? this._formatRegisterError(error)
+          : "Transport disconnected";
+        this._lastRegisterError = message;
+        this.emit("registration-changed", this._registrationStatusPayload({
+          online: false,
+          user: username || this.config.Username || "",
+          error: message
+        }));
+      },
+      onConnect: () => {
+        try { prev.onConnect?.(); } catch { /* ignore */ }
+        if (this._intentionallyUnregistered) return;
+        if (!this._transportEverConnected) {
+          this._transportEverConnected = true;
+          return;
+        }
+        // New socket after drop/server restart — REGISTER again so INVITEs arrive.
+        void this._reregisterAfterTransportRecover(username);
+      }
+    };
+  }
+
+  async _reregisterAfterTransportRecover(username) {
+    if (this._intentionallyUnregistered || !this.registerer) return;
+    if (this._reregisterAfterTransportInFlight) return;
+    this._reregisterAfterTransportInFlight = true;
+    try {
+      await this._registerWithRetry();
+      const registered = this.registerer?.state === this.SIP.RegistererState.Registered;
+      this.isRegistered = !!registered;
+      this._lastRegisterError = registered ? "" : (this._lastRegisterError || "Register failed");
+      this.emit("registration-changed", this._registrationStatusPayload({
+        online: registered,
+        user: username || this.config.Username || "",
+        error: registered ? undefined : this._lastRegisterError
+      }));
+    } catch (err) {
+      this.isRegistered = false;
+      const error = this._formatRegisterError(err);
+      this._lastRegisterError = error;
+      this.emit("registration-changed", this._registrationStatusPayload({
+        online: false,
+        user: username || this.config.Username || "",
+        error
+      }));
+    } finally {
+      this._reregisterAfterTransportInFlight = false;
+    }
   }
 
   configure(config = {}) {
@@ -362,10 +502,10 @@ export class PhoneCore extends EventEmitter {
     this.config = { ...before, ...(config || {}) };
     // Ringtone cannot be disabled via config.
     this.config.EnableRingtone = true;
+    // Rebuild UA when SIP provisioning changes and we are not registered.
+    // Must clear _registererWired or the next Registerer never gets state listeners.
     if (changedSipConfig && this.userAgent && !this.isRegistered) {
-      try { this.userAgent.stop?.(); } catch {}
-      this.userAgent = null;
-      this.registerer = null;
+      this._disposeUserAgent();
     }
     return this.config;
   }
@@ -388,9 +528,23 @@ export class PhoneCore extends EventEmitter {
 
   _iceGatheringTimeoutMs() {
     const raw = Number(this.config.IceStunCheckTimeout);
-    if (Number.isFinite(raw) && raw > 0) return raw;
-    // Legacy phone.js default.
-    return 500;
+    // 0 / unset = wait until ICE gathering completes (SIP.js: timeout only when > 0).
+    // Legacy 500ms truncated gathering and caused STUN 401 Unauthorized on hold
+    // renegotiation vs rtpengine ICE=force (bad ice-ufrag/pwd).
+    if (!Number.isFinite(raw) || raw < 0) return 0;
+    return raw;
+  }
+
+  /**
+   * Initial INVITE/answer may use timeout 0 (wait until complete). For hold
+   * re-INVITE, timeout 0 is unsafe: after updateDirection, Chromium often
+   * briefly re-enters "gathering" and never finishes with iceServers:[], so
+   * the re-INVITE never leaves the client.
+   */
+  _holdIceGatheringTimeoutMs() {
+    const configured = this._iceGatheringTimeoutMs();
+    if (configured > 0) return configured;
+    return 3000;
   }
 
   _buildPeerConnectionConfiguration() {
@@ -428,6 +582,97 @@ export class PhoneCore extends EventEmitter {
       type: description.type,
       sdp: next.join("\r\n")
     });
+  }
+
+  /**
+   * Keep ice-ufrag/ice-pwd from the current local description on hold re-INVITE.
+   * Accidental credential churn → STUN BINDING 401 Unauthorized to rtpengine.
+   */
+  _preserveIceCredentials(description) {
+    const prev = this.session?.sessionDescriptionHandler?.peerConnection?.localDescription?.sdp || "";
+    if (!prev || !description || typeof description.sdp !== "string") {
+      return Promise.resolve(description);
+    }
+    const ufrag = (prev.match(/^a=ice-ufrag:(.+)$/m) || [])[1];
+    const pwd = (prev.match(/^a=ice-pwd:(.+)$/m) || [])[1];
+    if (!ufrag || !pwd) return Promise.resolve(description);
+    let sdp = description.sdp;
+    // Replace every session/media ice-ufrag/pwd — a single /m replace leaves
+    // mismatched media-level lines and setLocalDescription can reject the offer.
+    if (/^a=ice-ufrag:/m.test(sdp)) {
+      sdp = sdp.replace(/^a=ice-ufrag:.*$/gm, `a=ice-ufrag:${ufrag}`);
+    }
+    if (/^a=ice-pwd:/m.test(sdp)) {
+      sdp = sdp.replace(/^a=ice-pwd:.*$/gm, `a=ice-pwd:${pwd}`);
+    }
+    return Promise.resolve({ type: description.type, sdp });
+  }
+
+  _holdSdpModifiers(onHold) {
+    // Keep modifiers minimal on re-INVITE. Heavy SDP rewriting before ICE
+    // gathering has finished has caused the first Hold click to stall/fail
+    // while leaving transceiver.direction already flipped.
+    const modifiers = [
+      (description) => this._filterNoisyIceCandidates(description)
+    ];
+    if (onHold && typeof this.SIP?.Web?.holdModifier === "function") {
+      modifiers.push(this.SIP.Web.holdModifier);
+    }
+    return modifiers;
+  }
+
+  /**
+   * SIP.js updateDirection mutates transceiver.direction before the re-INVITE
+   * is sent. If getOffer fails/stalls, direction stays on hold while isOnHold
+   * stays false — the next click then finally sends hold SDP.
+   */
+  _restoreTransceiverHoldDirection(onHold) {
+    const pc = this.session?.sessionDescriptionHandler?.peerConnection;
+    if (!pc || pc.signalingState !== "stable") return;
+    const map = (direction) => {
+      switch (direction) {
+        case "inactive":
+          return onHold ? "inactive" : "recvonly";
+        case "recvonly":
+          return onHold ? "inactive" : "recvonly";
+        case "sendonly":
+          return onHold ? "sendonly" : "sendrecv";
+        case "sendrecv":
+          return onHold ? "sendonly" : "sendrecv";
+        default:
+          return direction;
+      }
+    };
+    for (const transceiver of pc.getTransceivers()) {
+      if (!transceiver.direction || transceiver.direction === "stopped") continue;
+      const next = map(transceiver.direction);
+      if (next && next !== transceiver.direction) transceiver.direction = next;
+    }
+  }
+
+  /**
+   * SIP.js calls requestDelegate.onAccept even when setAnswer() fails on the
+   * 2xx (e.g. missing a=rtcp-mux). Treat that as failure so UI does not flip.
+   */
+  _holdRenegotiationSucceeded(onHold) {
+    const Established = this.SIP?.SessionState?.Established;
+    if (!this.session || (Established && this.session.state !== Established)) {
+      return false;
+    }
+    const pc = this.session.sessionDescriptionHandler?.peerConnection;
+    if (!pc || pc.connectionState === "closed" || pc.signalingState !== "stable") {
+      return false;
+    }
+    const audio = pc.getTransceivers().find((t) => {
+      const kind = t.receiver?.track?.kind || t.sender?.track?.kind;
+      return kind === "audio";
+    });
+    if (!audio) return true;
+    const dir = String(audio.currentDirection || audio.direction || "");
+    if (onHold) {
+      return dir === "sendonly" || dir === "inactive";
+    }
+    return dir === "sendrecv" || dir === "recvonly";
   }
 
   _bindMedia() {
@@ -489,7 +734,14 @@ export class PhoneCore extends EventEmitter {
     await this._ensureSip();
     this._intentionallyUnregistered = false;
     if (this.userAgent && this.isRegistered) {
-      return this._registrationStatusPayload({ online: true, user: this.config.Username });
+      const connected = typeof this.userAgent.isConnected === "function"
+        ? !!this.userAgent.isConnected()
+        : true;
+      if (connected) {
+        return this._registrationStatusPayload({ online: true, user: this.config.Username });
+      }
+      // Registered flag stale after transport drop — fall through to reconnect + REGISTER.
+      this.isRegistered = false;
     }
 
     const wsUrl = buildWsUrl(this.config);
@@ -511,12 +763,26 @@ export class PhoneCore extends EventEmitter {
       throw new Error(error);
     }
 
+    const fingerprint = this._uaFingerprint();
+    // Auth/server changed since UA was built — must recreate (credentials are baked into UA).
+    if (this.userAgent && this._uaBoundFingerprint && this._uaBoundFingerprint !== fingerprint) {
+      this._disposeUserAgent();
+    }
+
+    // After a failed register the WS may be down, UA stopped, or half-open after
+    // server restart (still reports Connected). Recycle so REGISTER uses a new socket.
+    if (this.userAgent) {
+      const Stopped = this.SIP.UserAgentState?.Stopped;
+      const stopped = Stopped != null && this.userAgent.state === Stopped;
+      if (stopped) {
+        this._disposeUserAgent();
+      } else {
+        await this._recycleTransport();
+      }
+    }
+
     const uri = this.SIP.UserAgent.makeURI(`sip:${username}@${domain}`);
     const traceSip = this.config.TraceSip === true || this.config.TraceSip === "1" || this.config.TraceSip === 1;
-    const transportOptions = {
-      server: wsUrl,
-      traceSip: !!traceSip
-    };
     if (!this.userAgent) {
       const auth = sipAuthorizationOptions(
         password,
@@ -527,7 +793,11 @@ export class PhoneCore extends EventEmitter {
         uri,
         authorizationUsername: username,
         ...auth,
-        transportOptions,
+        // Replace SIP.js default "SIP.js/0.21.2" with VPhone/<yy.mm.dd> build stamp.
+        userAgentString: getSipUserAgentString(),
+        transportOptions: this._buildTransportOptions(wsUrl, traceSip),
+        reconnectionAttempts: this._transportReconnectionAttempts(),
+        reconnectionDelay: this._transportReconnectionDelaySec(),
         // Keep console quiet unless TraceSip is explicitly enabled (dev).
         logLevel: traceSip ? "debug" : "error",
         logBuiltinEnabled: !!traceSip,
@@ -540,6 +810,8 @@ export class PhoneCore extends EventEmitter {
       uaOptions.sessionDescriptionHandlerFactoryOptions = this._buildSessionDescriptionHandlerFactoryOptions();
       this.userAgent = new this.SIP.UserAgent(uaOptions);
       this.registerer = new this.SIP.Registerer(this.userAgent);
+      this._uaBoundFingerprint = fingerprint;
+      this._transportEverConnected = false;
       this._wireRegisterer(username);
 
       this.userAgent.delegate = {
@@ -555,8 +827,12 @@ export class PhoneCore extends EventEmitter {
           });
         }
       };
+      this._wireTransportRecovery(username);
       await this.userAgent.start();
     } else if (this.registerer && !this._registererWired) {
+      this._wireRegisterer(username);
+    } else if (!this.registerer) {
+      this.registerer = new this.SIP.Registerer(this.userAgent);
       this._wireRegisterer(username);
     }
 
@@ -702,6 +978,7 @@ export class PhoneCore extends EventEmitter {
     if (this.isRegistered) {
       return this.unregister();
     }
+    // After register-failed: force a fresh attempt (reconnect / rebuild UA if needed).
     return this.register();
   }
 
@@ -861,12 +1138,6 @@ export class PhoneCore extends EventEmitter {
     }
   }
 
-  _holdMode() {
-    // Default SIP re-INVITE hold so PBX/rtpengine can apply MOH and related actions.
-    const mode = String(this.config.HoldMode || "sip").toLowerCase();
-    return mode === "local" || mode === "media" ? "local" : "sip";
-  }
-
   _holdIceRestartEnabled() {
     // Default OFF — same as legacy Phone/phone.js.
     // iceRestart:true + rtpengine ICE=force causes Role conflict / bad username / DTLS close.
@@ -886,15 +1157,8 @@ export class PhoneCore extends EventEmitter {
       throw new Error("Hold request already in progress");
     }
     if (this.isOnHold === !!onHold) {
+      // Re-sync UI only — do not pretend a new re-INVITE happened.
       this.emit("hold-changed", { onHold: !!onHold });
-      return this.isOnHold;
-    }
-
-    // Optional local/media hold (no SIP signaling).
-    if (this._holdMode() === "local") {
-      this.isOnHold = !!onHold;
-      this._applyLocalHoldState(!!onHold);
-      this.emit("hold-changed", { onHold: this.isOnHold });
       return this.isOnHold;
     }
 
@@ -903,47 +1167,99 @@ export class PhoneCore extends EventEmitter {
     }
 
     const previous = this.isOnHold;
+    const wantHold = !!onHold;
     this._holdInProgress = true;
+    // Emit progress so UI can disable Hold/Resume until the re-INVITE settles.
+    this.emit("hold-changed", { onHold: previous, pending: true });
 
-    // Match legacy holdSession/unholdSession: only toggle the hold flag.
-    // Do NOT force iceGatheringTimeout:1 or offerOptions — that truncated ICE
-    // gathering and desynced credentials vs rtpengine ICE=force (STUN 401 Unauthorized).
-    const reInviteOptions = this.session.sessionDescriptionHandlerOptionsReInvite || {};
-    reInviteOptions.hold = !!onHold;
-    delete reInviteOptions.constraints;
-    delete reInviteOptions.iceGatheringTimeout;
+    // Always SIP re-INVITE hold (a=sendonly / resume a=sendrecv).
+    // Never iceRestart unless explicitly enabled — restart + rtpengine ICE=force
+    // → Role conflict / STUN 401 Unauthorized (bad username).
+    const holdModifiers = this._holdSdpModifiers(wantHold);
+    const reInviteOptions = {
+      hold: wantHold,
+      iceGatheringTimeout: this._holdIceGatheringTimeoutMs()
+    };
     if (this._holdIceRestartEnabled()) {
       reInviteOptions.offerOptions = { iceRestart: true };
-    } else {
-      delete reInviteOptions.offerOptions;
     }
     this.session.sessionDescriptionHandlerOptionsReInvite = reInviteOptions;
+    this.session.sessionDescriptionHandlerModifiersReInvite = holdModifiers;
+
+    const failHold = (message) => {
+      this.isOnHold = previous;
+      this._restoreTransceiverHoldDirection(previous);
+      this._applyLocalHoldState(previous);
+      this.emit("hold-changed", { onHold: this.isOnHold, pending: false });
+      return new Error(message || "Hold failed");
+    };
 
     try {
       await new Promise((resolve, reject) => {
-        this.session.invite({
+        let settled = false;
+        const finish = (fn, value) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          fn(value);
+        };
+        // Bound the whole renegotiation — ICE wait alone is not enough if 2xx
+        // handling stalls or SIP.js fires a bogus onAccept after setAnswer fails.
+        const timer = setTimeout(() => {
+          finish(reject, failHold("Hold request timed out"));
+        }, Math.max(8000, this._holdIceGatheringTimeoutMs() + 5000));
+
+        const invitePromise = this.session.invite({
+          sessionDescriptionHandlerOptions: reInviteOptions,
+          sessionDescriptionHandlerModifiers: holdModifiers,
           requestDelegate: {
             onAccept: () => {
-              this.isOnHold = !!onHold;
-              this._applyLocalHoldState(!!onHold);
-              try { this._attachRemoteFromSession(this.session); } catch {}
-              this.emit("hold-changed", { onHold: this.isOnHold });
-              resolve(this.isOnHold);
+              // SIP.js invokes onAccept even when setAnswer() rejected the 2xx SDP
+              // (RTCP-MUX missing, etc.). Only flip local hold after PC looks good.
+              if (!this._holdRenegotiationSucceeded(wantHold)) {
+                finish(reject, failHold(
+                  wantHold
+                    ? "Hold renegotiation failed (bad answer SDP)"
+                    : "Resume renegotiation failed (bad answer SDP)"
+                ));
+                return;
+              }
+              this.isOnHold = wantHold;
+              this._applyLocalHoldState(wantHold);
+              try { this._attachRemoteFromSession(this.session); } catch { /* ignore */ }
+              this.emit("hold-changed", { onHold: this.isOnHold, pending: false });
+              finish(resolve, this.isOnHold);
             },
             onReject: (response) => {
-              this.isOnHold = previous;
-              this._applyLocalHoldState(previous);
-              this.emit("hold-changed", { onHold: this.isOnHold });
               const code = response?.message?.statusCode || response?.statusCode;
-              reject(new Error(code ? `Hold request rejected: ${code}` : "Hold request rejected"));
+              finish(reject, failHold(
+                code ? `Hold request rejected: ${code}` : "Hold request rejected"
+              ));
             }
           }
-        }).catch(reject);
+        });
+
+        Promise.resolve(invitePromise).catch((err) => {
+          const message = String(err?.message || err || "");
+          if (/already in progress|RequestPending/i.test(message)) {
+            finish(reject, failHold("Hold request already in progress"));
+            return;
+          }
+          finish(reject, failHold(message || "Hold failed"));
+        });
       });
     } catch (err) {
-      this.isOnHold = previous;
-      this._applyLocalHoldState(previous);
-      this.emit("hold-changed", { onHold: this.isOnHold });
+      if (this._holdInProgress) {
+        // failHold already restored state when used; still normalize unknowns.
+        if (this.isOnHold !== previous) {
+          this.isOnHold = previous;
+          this._restoreTransceiverHoldDirection(previous);
+          this._applyLocalHoldState(previous);
+          this.emit("hold-changed", { onHold: this.isOnHold, pending: false });
+        } else {
+          this.emit("hold-changed", { onHold: this.isOnHold, pending: false });
+        }
+      }
       const message = String(err?.message || err || "");
       if (/already in progress|RequestPending/i.test(message)) {
         throw new Error("Hold request already in progress");

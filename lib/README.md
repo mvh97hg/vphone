@@ -157,7 +157,6 @@ Only include keys that differ from defaults. No legacy aliases.
 | `EnableMultiTabLeader` | `true` (browser) | One REGISTER per extension across tabs. |
 | `PasswordType` | unset=`plain` | `plain` or `ha1`. Storage always HA1. |
 | `MaxDidLength` | `24` | Max dial length. |
-| `HoldMode` | `sip` | Hold signaling mode. |
 
 ## SIP / media
 

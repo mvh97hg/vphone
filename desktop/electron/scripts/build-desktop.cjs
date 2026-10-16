@@ -50,6 +50,13 @@ async function main() {
     }
   }
 
+  const pad2 = (value) => String(value).padStart(2, "0");
+  const now = new Date();
+  const buildVersion = `${pad2(now.getFullYear() % 100)}.${pad2(now.getMonth() + 1)}.${pad2(now.getDate())}`;
+  const buildDefines = {
+    __VPHONE_BUILD_VERSION__: JSON.stringify(buildVersion)
+  };
+
   await esbuild.build({
     entryPoints: [path.join(desktopRoot, "src", "main.ts")],
     outfile: path.join(desktopRoot, "main.js"),
@@ -57,7 +64,8 @@ async function main() {
     platform: "node",
     format: "cjs",
     target: "node20",
-    external: ["electron"],
+    external: ["electron", "koffi"],
+    define: buildDefines,
     logLevel: "info"
   });
 
@@ -69,6 +77,7 @@ async function main() {
     format: "cjs",
     target: "node20",
     external: ["electron"],
+    define: buildDefines,
     logLevel: "info"
   });
 
@@ -79,8 +88,10 @@ async function main() {
     platform: "browser",
     format: "esm",
     target: "es2020",
+    define: buildDefines,
     logLevel: "info"
   });
+  console.log(`[build-desktop] SIP User-Agent: VPhone/${buildVersion}`);
 }
 
 main().catch((error) => {

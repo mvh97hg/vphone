@@ -176,6 +176,22 @@ function sipAuthorizationOptions(rawPassword, rawType) {
   return { authorizationPassword: auth.password, authorizationHa1: void 0 };
 }
 
+// ../../src/version.js
+function pad2(value) {
+  return String(value).padStart(2, "0");
+}
+function formatBuildVersion(date = /* @__PURE__ */ new Date()) {
+  const yy = pad2(date.getFullYear() % 100);
+  const mm = pad2(date.getMonth() + 1);
+  const dd = pad2(date.getDate());
+  return `${yy}.${mm}.${dd}`;
+}
+var VPHONE_BUILD_VERSION = true ? "26.10.16" : formatBuildVersion();
+function getSipUserAgentString(version = VPHONE_BUILD_VERSION) {
+  const ver = String(version || formatBuildVersion()).trim() || formatBuildVersion();
+  return `VPhone/${ver}`;
+}
+
 // ../../src/core/phone-core.js
 function buildWsUrl(config) {
   const host = config.Server || "";
@@ -189,6 +205,14 @@ function resolveSipDomain(config = {}) {
   const explicit = String(config.Domain || "").trim();
   if (explicit) return explicit;
   return String(config.Server || "").trim();
+}
+function sipCallerFromInvitation(invitation) {
+  const identity = invitation?.assertedIdentity || invitation?.remoteIdentity || null;
+  const uri = identity?.uri;
+  const number = uri?.user != null ? String(uri.user).trim() : "";
+  const displayName = identity?.displayName != null ? String(identity.displayName).trim() : "";
+  const from = uri != null ? String(uri) : "";
+  return { from, number, displayName };
 }
 var SIPJS_FILENAME = "sip-0.21.2.min.js";
 function resolveBundledSipJsUrl() {
@@ -244,7 +268,7 @@ var EventEmitter = class {
     for (const handler of set) handler(payload);
   }
 };
-var _MediaManager_instances, replaceTrack_fn;
+var _MediaManager_instances, normalizeConstraints_fn, liveTracks_fn, wireTrackEnded_fn, mediaAccessError_fn, getUserMediaWithTimeout_fn, assertStreamMatches_fn, replaceTrack_fn;
 var MediaManager = class extends EventEmitter {
   constructor({ mediaDevices = navigator.mediaDevices } = {}) {
     super();
@@ -280,22 +304,56 @@ var MediaManager = class extends EventEmitter {
     if (micId) audio.deviceId = { ideal: micId };
     return audio;
   }
+  /**
+   * Ensure mic/camera access before call/answer.
+   * Reuses live tracks when already granted; otherwise getUserMedia (browser prompt).
+   * Do not await Permissions API first — that can drop the user-gesture and block the prompt.
+   */
+  async ensureMediaAccess(constraints) {
+    const normalized = __privateMethod(this, _MediaManager_instances, normalizeConstraints_fn).call(this, constraints);
+    const wantAudio = !!normalized.audio;
+    const wantVideo = !!normalized.video;
+    const live = __privateMethod(this, _MediaManager_instances, liveTracks_fn).call(this);
+    if (this.localStream && !live.length) {
+      this.localStream = null;
+    }
+    const hasLiveAudio = live.some((track) => track.kind === "audio");
+    const hasLiveVideo = live.some((track) => track.kind === "video");
+    if (this.localStream && (!wantAudio || hasLiveAudio) && (!wantVideo || hasLiveVideo)) {
+      this.emit("local-stream", this.localStream);
+      return this.localStream;
+    }
+    if (this.localStream) this.stopLocalStream();
+    return this.getLocalStream(normalized);
+  }
   async getLocalStream(constraints) {
-    const normalized = constraints && typeof constraints === "object" ? {
-      audio: constraints.audio === void 0 ? this.getAudioConstraints() : constraints.audio === true ? this.getAudioConstraints() : constraints.audio,
-      video: constraints.video ?? false
-    } : { audio: this.getAudioConstraints(), video: false };
+    const normalized = __privateMethod(this, _MediaManager_instances, normalizeConstraints_fn).call(this, constraints);
     this.currentConstraints = normalized;
     const wantAudio = !!normalized.audio;
     const wantVideo = !!normalized.video;
-    const liveTracks = this.localStream?.getTracks?.().filter((track) => track.readyState === "live") || [];
+    const liveTracks = __privateMethod(this, _MediaManager_instances, liveTracks_fn).call(this);
     const hasLiveAudio = liveTracks.some((track) => track.kind === "audio");
     const hasLiveVideo = liveTracks.some((track) => track.kind === "video");
     if (this.localStream && (!wantAudio || hasLiveAudio) && (!wantVideo || hasLiveVideo)) {
       this.emit("local-stream", this.localStream);
       return this.localStream;
     }
-    this.localStream = await this.mediaDevices.getUserMedia(normalized);
+    let stream;
+    try {
+      stream = await __privateMethod(this, _MediaManager_instances, getUserMediaWithTimeout_fn).call(this, normalized);
+    } catch (err) {
+      const simple = { audio: !!wantAudio, video: !!wantVideo };
+      try {
+        stream = await __privateMethod(this, _MediaManager_instances, getUserMediaWithTimeout_fn).call(this, simple);
+      } catch (retryErr) {
+        const name = String(retryErr?.name || err?.name || "NotAllowedError");
+        const message = String(retryErr?.message || err?.message || "Microphone permission required");
+        throw __privateMethod(this, _MediaManager_instances, mediaAccessError_fn).call(this, message, name);
+      }
+    }
+    __privateMethod(this, _MediaManager_instances, assertStreamMatches_fn).call(this, stream, { wantAudio, wantVideo });
+    this.localStream = stream;
+    __privateMethod(this, _MediaManager_instances, wireTrackEnded_fn).call(this, this.localStream);
     this.emit("local-stream", this.localStream);
     return this.localStream;
   }
@@ -346,6 +404,65 @@ var MediaManager = class extends EventEmitter {
   }
 };
 _MediaManager_instances = new WeakSet();
+normalizeConstraints_fn = function(constraints) {
+  if (constraints && typeof constraints === "object") {
+    return {
+      audio: constraints.audio === void 0 ? this.getAudioConstraints() : constraints.audio === true ? this.getAudioConstraints() : constraints.audio,
+      video: constraints.video ?? false
+    };
+  }
+  return { audio: this.getAudioConstraints(), video: false };
+};
+liveTracks_fn = function() {
+  return this.localStream?.getTracks?.().filter((track) => track.readyState === "live") || [];
+};
+wireTrackEnded_fn = function(stream) {
+  if (!stream?.getTracks) return;
+  for (const track of stream.getTracks()) {
+    track.onended = () => {
+      const live = __privateMethod(this, _MediaManager_instances, liveTracks_fn).call(this);
+      if (!live.length && this.localStream === stream) {
+        this.localStream = null;
+        this.emit("local-stream-stopped", stream);
+      }
+    };
+  }
+};
+mediaAccessError_fn = function(message, name = "NotAllowedError") {
+  const err = new Error(message || "Microphone permission required");
+  err.name = name;
+  return err;
+};
+getUserMediaWithTimeout_fn = async function(constraints, timeoutMs = 2e4) {
+  if (!this.mediaDevices || typeof this.mediaDevices.getUserMedia !== "function") {
+    throw __privateMethod(this, _MediaManager_instances, mediaAccessError_fn).call(this, "Media devices unavailable");
+  }
+  let timer = null;
+  try {
+    return await Promise.race([
+      this.mediaDevices.getUserMedia(constraints),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => {
+          reject(__privateMethod(this, _MediaManager_instances, mediaAccessError_fn).call(this, "Microphone permission timeout"));
+        }, timeoutMs);
+      })
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+};
+assertStreamMatches_fn = function(stream, { wantAudio, wantVideo }) {
+  const live = stream?.getTracks?.().filter((track) => track.readyState === "live") || [];
+  const hasLiveAudio = live.some((track) => track.kind === "audio");
+  const hasLiveVideo = live.some((track) => track.kind === "video");
+  if (wantAudio && !hasLiveAudio) {
+    throw __privateMethod(this, _MediaManager_instances, mediaAccessError_fn).call(this, "Microphone permission required");
+  }
+  if (wantVideo && !hasLiveVideo) {
+    throw __privateMethod(this, _MediaManager_instances, mediaAccessError_fn).call(this, "Camera permission required");
+  }
+  return stream;
+};
 replaceTrack_fn = function(existingTracks, nextTrack) {
   for (const track of existingTracks) {
     this.localStream.removeTrack(track);
@@ -368,10 +485,140 @@ var PhoneCore = class extends EventEmitter {
     this.isRegistered = false;
     this._holdInProgress = false;
     this._lastRegisterError = "";
+    this._intentionallyUnregistered = false;
     this._registererWired = false;
+    this._uaBoundFingerprint = "";
+    this._transportEverConnected = false;
+    this._reregisterAfterTransportInFlight = false;
     this._boundRemoteEl = null;
     this._boundLocalEl = null;
     this._bindMedia();
+  }
+  _uaFingerprint(config = this.config) {
+    const cfg = config || {};
+    return [
+      buildWsUrl(cfg),
+      String(cfg.Username || "").trim(),
+      resolveSipDomain(cfg),
+      String(cfg.Password || ""),
+      String(cfg.PasswordType || "").trim().toLowerCase()
+    ].join("|");
+  }
+  _transportKeepAliveIntervalSec() {
+    const raw = Number(this.config.TransportKeepAliveInterval);
+    if (!Number.isFinite(raw)) return 15;
+    if (raw < 0) return 0;
+    return raw;
+  }
+  _transportReconnectionAttempts() {
+    const raw = Number(this.config.TransportReconnectionAttempts);
+    if (!Number.isFinite(raw) || raw < 0) return 10;
+    return Math.floor(raw);
+  }
+  _transportReconnectionDelaySec() {
+    const raw = Number(this.config.TransportReconnectionTimeout);
+    if (!Number.isFinite(raw) || raw < 0) return 4;
+    return raw;
+  }
+  _buildTransportOptions(wsUrl, traceSip) {
+    return {
+      server: wsUrl,
+      traceSip: !!traceSip,
+      keepAliveInterval: this._transportKeepAliveIntervalSec(),
+      connectionTimeout: 5
+    };
+  }
+  _disposeUserAgent() {
+    if (this.userAgent) {
+      try {
+        this.userAgent.stop?.();
+      } catch {
+      }
+    }
+    this.userAgent = null;
+    this.registerer = null;
+    this._registererWired = false;
+    this._uaBoundFingerprint = "";
+    this._transportEverConnected = false;
+    this._reregisterAfterTransportInFlight = false;
+    this.isRegistered = false;
+  }
+  /**
+   * Half-open WSS after server restart still reports Connected; reconnect() is a
+   * no-op in that state. Disconnect first so the next connect opens a new socket.
+   */
+  async _recycleTransport() {
+    if (!this.userAgent) return;
+    try {
+      await this.userAgent.transport?.disconnect?.();
+    } catch {
+    }
+    try {
+      await this.userAgent.reconnect();
+    } catch {
+      this._disposeUserAgent();
+    }
+  }
+  _wireTransportRecovery(username) {
+    if (!this.userAgent) return;
+    const prev = this.userAgent.delegate && typeof this.userAgent.delegate === "object" ? this.userAgent.delegate : {};
+    this.userAgent.delegate = {
+      ...prev,
+      onDisconnect: (error) => {
+        try {
+          prev.onDisconnect?.(error);
+        } catch {
+        }
+        this.isRegistered = false;
+        if (this._intentionallyUnregistered) return;
+        const message = error ? this._formatRegisterError(error) : "Transport disconnected";
+        this._lastRegisterError = message;
+        this.emit("registration-changed", this._registrationStatusPayload({
+          online: false,
+          user: username || this.config.Username || "",
+          error: message
+        }));
+      },
+      onConnect: () => {
+        try {
+          prev.onConnect?.();
+        } catch {
+        }
+        if (this._intentionallyUnregistered) return;
+        if (!this._transportEverConnected) {
+          this._transportEverConnected = true;
+          return;
+        }
+        void this._reregisterAfterTransportRecover(username);
+      }
+    };
+  }
+  async _reregisterAfterTransportRecover(username) {
+    if (this._intentionallyUnregistered || !this.registerer) return;
+    if (this._reregisterAfterTransportInFlight) return;
+    this._reregisterAfterTransportInFlight = true;
+    try {
+      await this._registerWithRetry();
+      const registered = this.registerer?.state === this.SIP.RegistererState.Registered;
+      this.isRegistered = !!registered;
+      this._lastRegisterError = registered ? "" : this._lastRegisterError || "Register failed";
+      this.emit("registration-changed", this._registrationStatusPayload({
+        online: registered,
+        user: username || this.config.Username || "",
+        error: registered ? void 0 : this._lastRegisterError
+      }));
+    } catch (err) {
+      this.isRegistered = false;
+      const error = this._formatRegisterError(err);
+      this._lastRegisterError = error;
+      this.emit("registration-changed", this._registrationStatusPayload({
+        online: false,
+        user: username || this.config.Username || "",
+        error
+      }));
+    } finally {
+      this._reregisterAfterTransportInFlight = false;
+    }
   }
   configure(config = {}) {
     const before = this.config || {};
@@ -388,12 +635,7 @@ var PhoneCore = class extends EventEmitter {
     this.config = { ...before, ...config || {} };
     this.config.EnableRingtone = true;
     if (changedSipConfig && this.userAgent && !this.isRegistered) {
-      try {
-        this.userAgent.stop?.();
-      } catch {
-      }
-      this.userAgent = null;
-      this.registerer = null;
+      this._disposeUserAgent();
     }
     return this.config;
   }
@@ -414,8 +656,19 @@ var PhoneCore = class extends EventEmitter {
   }
   _iceGatheringTimeoutMs() {
     const raw = Number(this.config.IceStunCheckTimeout);
-    if (Number.isFinite(raw) && raw > 0) return raw;
-    return 500;
+    if (!Number.isFinite(raw) || raw < 0) return 0;
+    return raw;
+  }
+  /**
+   * Initial INVITE/answer may use timeout 0 (wait until complete). For hold
+   * re-INVITE, timeout 0 is unsafe: after updateDirection, Chromium often
+   * briefly re-enters "gathering" and never finishes with iceServers:[], so
+   * the re-INVITE never leaves the client.
+   */
+  _holdIceGatheringTimeoutMs() {
+    const configured = this._iceGatheringTimeoutMs();
+    if (configured > 0) return configured;
+    return 3e3;
   }
   _buildPeerConnectionConfiguration() {
     const config = {
@@ -450,6 +703,88 @@ var PhoneCore = class extends EventEmitter {
       sdp: next.join("\r\n")
     });
   }
+  /**
+   * Keep ice-ufrag/ice-pwd from the current local description on hold re-INVITE.
+   * Accidental credential churn → STUN BINDING 401 Unauthorized to rtpengine.
+   */
+  _preserveIceCredentials(description) {
+    const prev = this.session?.sessionDescriptionHandler?.peerConnection?.localDescription?.sdp || "";
+    if (!prev || !description || typeof description.sdp !== "string") {
+      return Promise.resolve(description);
+    }
+    const ufrag = (prev.match(/^a=ice-ufrag:(.+)$/m) || [])[1];
+    const pwd = (prev.match(/^a=ice-pwd:(.+)$/m) || [])[1];
+    if (!ufrag || !pwd) return Promise.resolve(description);
+    let sdp = description.sdp;
+    if (/^a=ice-ufrag:/m.test(sdp)) {
+      sdp = sdp.replace(/^a=ice-ufrag:.*$/gm, `a=ice-ufrag:${ufrag}`);
+    }
+    if (/^a=ice-pwd:/m.test(sdp)) {
+      sdp = sdp.replace(/^a=ice-pwd:.*$/gm, `a=ice-pwd:${pwd}`);
+    }
+    return Promise.resolve({ type: description.type, sdp });
+  }
+  _holdSdpModifiers(onHold) {
+    const modifiers = [
+      (description) => this._filterNoisyIceCandidates(description)
+    ];
+    if (onHold && typeof this.SIP?.Web?.holdModifier === "function") {
+      modifiers.push(this.SIP.Web.holdModifier);
+    }
+    return modifiers;
+  }
+  /**
+   * SIP.js updateDirection mutates transceiver.direction before the re-INVITE
+   * is sent. If getOffer fails/stalls, direction stays on hold while isOnHold
+   * stays false — the next click then finally sends hold SDP.
+   */
+  _restoreTransceiverHoldDirection(onHold) {
+    const pc = this.session?.sessionDescriptionHandler?.peerConnection;
+    if (!pc || pc.signalingState !== "stable") return;
+    const map = (direction) => {
+      switch (direction) {
+        case "inactive":
+          return onHold ? "inactive" : "recvonly";
+        case "recvonly":
+          return onHold ? "inactive" : "recvonly";
+        case "sendonly":
+          return onHold ? "sendonly" : "sendrecv";
+        case "sendrecv":
+          return onHold ? "sendonly" : "sendrecv";
+        default:
+          return direction;
+      }
+    };
+    for (const transceiver of pc.getTransceivers()) {
+      if (!transceiver.direction || transceiver.direction === "stopped") continue;
+      const next = map(transceiver.direction);
+      if (next && next !== transceiver.direction) transceiver.direction = next;
+    }
+  }
+  /**
+   * SIP.js calls requestDelegate.onAccept even when setAnswer() fails on the
+   * 2xx (e.g. missing a=rtcp-mux). Treat that as failure so UI does not flip.
+   */
+  _holdRenegotiationSucceeded(onHold) {
+    const Established = this.SIP?.SessionState?.Established;
+    if (!this.session || Established && this.session.state !== Established) {
+      return false;
+    }
+    const pc = this.session.sessionDescriptionHandler?.peerConnection;
+    if (!pc || pc.connectionState === "closed" || pc.signalingState !== "stable") {
+      return false;
+    }
+    const audio = pc.getTransceivers().find((t) => {
+      const kind = t.receiver?.track?.kind || t.sender?.track?.kind;
+      return kind === "audio";
+    });
+    if (!audio) return true;
+    const dir = String(audio.currentDirection || audio.direction || "");
+    if (onHold) {
+      return dir === "sendonly" || dir === "inactive";
+    }
+    return dir === "sendrecv" || dir === "recvonly";
+  }
   _bindMedia() {
     this.media.on("local-stream", (stream) => this.emit("local-stream", stream));
   }
@@ -457,10 +792,58 @@ var PhoneCore = class extends EventEmitter {
     this._boundRemoteEl = remoteEl || null;
     this._boundLocalEl = localEl || null;
   }
+  /**
+   * Read host-configured INVITE headers (config.IncomingHeaders: string[]).
+   * Returns { [headerName]: rawValue } for names that are present.
+   */
+  _extractIncomingHeaders(invitation) {
+    const names = Array.isArray(this.config?.IncomingHeaders) ? this.config.IncomingHeaders : [];
+    if (!names.length) return {};
+    const request = invitation?.request;
+    if (!request || typeof request.getHeader !== "function") return {};
+    const headers = {};
+    for (const rawName of names) {
+      const name = String(rawName || "").trim();
+      if (!name) continue;
+      try {
+        const value = request.getHeader(name);
+        if (value == null || value === "") continue;
+        headers[name] = String(value);
+      } catch {
+      }
+    }
+    return headers;
+  }
+  _registrationStatusPayload({ online, user, error } = {}) {
+    if (online) {
+      return { online: true, status: "online", user: user || "", error: void 0 };
+    }
+    if (this._intentionallyUnregistered) {
+      return {
+        online: false,
+        status: "offline",
+        reason: "unregistered",
+        user: user || "",
+        error: void 0
+      };
+    }
+    return {
+      online: false,
+      status: "register-failed",
+      reason: "failure",
+      user: user || "",
+      error: error || this._lastRegisterError || "Register failed"
+    };
+  }
   async register() {
     await this._ensureSip();
+    this._intentionallyUnregistered = false;
     if (this.userAgent && this.isRegistered) {
-      return { online: true, user: this.config.Username };
+      const connected = typeof this.userAgent.isConnected === "function" ? !!this.userAgent.isConnected() : true;
+      if (connected) {
+        return this._registrationStatusPayload({ online: true, user: this.config.Username });
+      }
+      this.isRegistered = false;
     }
     const wsUrl = buildWsUrl(this.config);
     const username = this.config.Username;
@@ -473,15 +856,28 @@ var PhoneCore = class extends EventEmitter {
       const error = "Missing SIP configuration";
       this.isRegistered = false;
       this._lastRegisterError = error;
-      this.emit("registration-changed", { online: false, user: username || "", error });
+      this.emit("registration-changed", this._registrationStatusPayload({
+        online: false,
+        user: username || "",
+        error
+      }));
       throw new Error(error);
+    }
+    const fingerprint = this._uaFingerprint();
+    if (this.userAgent && this._uaBoundFingerprint && this._uaBoundFingerprint !== fingerprint) {
+      this._disposeUserAgent();
+    }
+    if (this.userAgent) {
+      const Stopped = this.SIP.UserAgentState?.Stopped;
+      const stopped = Stopped != null && this.userAgent.state === Stopped;
+      if (stopped) {
+        this._disposeUserAgent();
+      } else {
+        await this._recycleTransport();
+      }
     }
     const uri = this.SIP.UserAgent.makeURI(`sip:${username}@${domain}`);
     const traceSip = this.config.TraceSip === true || this.config.TraceSip === "1" || this.config.TraceSip === 1;
-    const transportOptions = {
-      server: wsUrl,
-      traceSip: !!traceSip
-    };
     if (!this.userAgent) {
       const auth = sipAuthorizationOptions(
         password,
@@ -492,7 +888,11 @@ var PhoneCore = class extends EventEmitter {
         uri,
         authorizationUsername: username,
         ...auth,
-        transportOptions,
+        // Replace SIP.js default "SIP.js/0.21.2" with VPhone/<yy.mm.dd> build stamp.
+        userAgentString: getSipUserAgentString(),
+        transportOptions: this._buildTransportOptions(wsUrl, traceSip),
+        reconnectionAttempts: this._transportReconnectionAttempts(),
+        reconnectionDelay: this._transportReconnectionDelaySec(),
         // Keep console quiet unless TraceSip is explicitly enabled (dev).
         logLevel: traceSip ? "debug" : "error",
         logBuiltinEnabled: !!traceSip,
@@ -504,19 +904,28 @@ var PhoneCore = class extends EventEmitter {
       uaOptions.sessionDescriptionHandlerFactoryOptions = this._buildSessionDescriptionHandlerFactoryOptions();
       this.userAgent = new this.SIP.UserAgent(uaOptions);
       this.registerer = new this.SIP.Registerer(this.userAgent);
+      this._uaBoundFingerprint = fingerprint;
+      this._transportEverConnected = false;
       this._wireRegisterer(username);
       this.userAgent.delegate = {
         onInvite: (invitation) => {
           this.session = invitation;
           this._wireSession(invitation, "incoming");
+          const caller = sipCallerFromInvitation(invitation);
           this.emit("incoming-call", {
-            from: String(invitation.remoteIdentity?.uri || ""),
-            displayName: String(invitation.remoteIdentity?.displayName || "")
+            from: caller.from,
+            number: caller.number,
+            displayName: caller.displayName,
+            headers: this._extractIncomingHeaders(invitation)
           });
         }
       };
+      this._wireTransportRecovery(username);
       await this.userAgent.start();
     } else if (this.registerer && !this._registererWired) {
+      this._wireRegisterer(username);
+    } else if (!this.registerer) {
+      this.registerer = new this.SIP.Registerer(this.userAgent);
       this._wireRegisterer(username);
     }
     try {
@@ -524,15 +933,23 @@ var PhoneCore = class extends EventEmitter {
       const registered = this.registerer?.state === this.SIP.RegistererState.Registered;
       this.isRegistered = !!registered;
       this._lastRegisterError = registered ? "" : this._lastRegisterError;
-      const state = registered ? { online: true, user: username } : { online: false, user: username, error: this._lastRegisterError || "Register failed" };
+      const state = this._registrationStatusPayload({
+        online: registered,
+        user: username,
+        error: registered ? void 0 : this._lastRegisterError || "Register failed"
+      });
       this.emit("registration-changed", state);
-      if (!registered) throw new Error(state.error);
+      if (!registered) throw new Error(state.error || "Register failed");
       return state;
     } catch (err) {
       this.isRegistered = false;
       const error = this._formatRegisterError(err);
       this._lastRegisterError = error;
-      this.emit("registration-changed", { online: false, user: username, error });
+      this.emit("registration-changed", this._registrationStatusPayload({
+        online: false,
+        user: username,
+        error
+      }));
       throw err instanceof Error ? err : new Error(error);
     }
   }
@@ -543,12 +960,15 @@ var PhoneCore = class extends EventEmitter {
       const Registered = this.SIP.RegistererState.Registered;
       const online = state === Registered;
       this.isRegistered = online;
-      if (online) this._lastRegisterError = "";
-      this.emit("registration-changed", {
+      if (online) {
+        this._intentionallyUnregistered = false;
+        this._lastRegisterError = "";
+      }
+      this.emit("registration-changed", this._registrationStatusPayload({
         online,
         user: username || this.config.Username || "",
         error: online ? void 0 : this._lastRegisterError || void 0
-      });
+      }));
     };
     if (this.registerer.stateChange?.addListener) {
       this.registerer.stateChange.addListener(emitFromState);
@@ -608,37 +1028,47 @@ var PhoneCore = class extends EventEmitter {
     return this.SIP;
   }
   async unregister() {
-    if (!this.userAgent || !this.registerer) return;
+    this._intentionallyUnregistered = true;
+    this._lastRegisterError = "";
+    if (!this.userAgent || !this.registerer) {
+      const state = this._registrationStatusPayload({
+        online: false,
+        user: this.config.Username || ""
+      });
+      this.emit("registration-changed", state);
+      return state;
+    }
     try {
       await this.registerer.unregister();
     } finally {
       this.isRegistered = false;
       this.media.stopLocalStream();
-      const state = { online: false };
+      const state = this._registrationStatusPayload({
+        online: false,
+        user: this.config.Username || ""
+      });
       this.emit("registration-changed", state);
       return state;
     }
   }
   async warmMedia(constraints = { audio: true, video: false }) {
     try {
-      await this.media.getLocalStream(constraints);
+      await this.media.ensureMediaAccess(constraints);
     } catch {
     }
   }
   async toggleRegistration() {
     if (this.isRegistered) {
-      await this.unregister();
-      return { online: false };
+      return this.unregister();
     }
-    await this.register();
-    return { online: true };
+    return this.register();
   }
   getRegistrationState() {
-    return {
+    return this._registrationStatusPayload({
       online: !!this.isRegistered,
       user: this.config.Username || "",
       error: this.isRegistered ? void 0 : this._lastRegisterError || void 0
-    };
+    });
   }
   async call(target, options = {}) {
     await this.register();
@@ -647,13 +1077,12 @@ var PhoneCore = class extends EventEmitter {
     const targetUri = this.SIP.UserAgent.makeURI(`sip:${target}@${domain}`);
     const constraints = options.constraints || { audio: this.media.getAudioConstraints(), video: !!options.video };
     const extraHeaders = Array.isArray(options.extraHeaders) ? options.extraHeaders.map((h) => String(h || "").trim()).filter(Boolean) : [];
-    const mediaPromise = this.media.getLocalStream(constraints);
+    const localStream = await this.media.ensureMediaAccess(constraints);
     const inviterOptions = extraHeaders.length ? { extraHeaders } : void 0;
     const inviter = new this.SIP.Inviter(this.userAgent, targetUri, inviterOptions);
     this.session = inviter;
     this._wireSession(inviter, "outgoing");
     this.emit("outgoing-call", { target, extraHeaders });
-    const localStream = await mediaPromise;
     this._attachLocal(localStream);
     const iceFilter = (description) => this._filterNoisyIceCandidates(description);
     const pcOpts = {
@@ -680,7 +1109,7 @@ var PhoneCore = class extends EventEmitter {
   async answer(options = {}) {
     if (!this.session || typeof this.session.accept !== "function") throw new Error("No incoming call");
     const constraints = options.constraints || { audio: this.media.getAudioConstraints(), video: !!options.video };
-    const localStream = await this.media.getLocalStream(constraints);
+    const localStream = await this.media.ensureMediaAccess(constraints);
     this._attachLocal(localStream);
     const iceFilter = (description) => this._filterNoisyIceCandidates(description);
     await this.session.accept({
@@ -771,10 +1200,6 @@ var PhoneCore = class extends EventEmitter {
       }
     }
   }
-  _holdMode() {
-    const mode = String(this.config.HoldMode || "sip").toLowerCase();
-    return mode === "local" || mode === "media" ? "local" : "sip";
-  }
   _holdIceRestartEnabled() {
     const raw = this.config.HoldIceRestart;
     return raw === true || raw === "1" || raw === 1 || raw === "true";
@@ -794,55 +1219,90 @@ var PhoneCore = class extends EventEmitter {
       this.emit("hold-changed", { onHold: !!onHold });
       return this.isOnHold;
     }
-    if (this._holdMode() === "local") {
-      this.isOnHold = !!onHold;
-      this._applyLocalHoldState(!!onHold);
-      this.emit("hold-changed", { onHold: this.isOnHold });
-      return this.isOnHold;
-    }
     if (typeof this.session.invite !== "function") {
       throw new Error("No active session to hold");
     }
     const previous = this.isOnHold;
+    const wantHold = !!onHold;
     this._holdInProgress = true;
-    const reInviteOptions = this.session.sessionDescriptionHandlerOptionsReInvite || {};
-    reInviteOptions.hold = !!onHold;
-    delete reInviteOptions.constraints;
-    delete reInviteOptions.iceGatheringTimeout;
+    this.emit("hold-changed", { onHold: previous, pending: true });
+    const holdModifiers = this._holdSdpModifiers(wantHold);
+    const reInviteOptions = {
+      hold: wantHold,
+      iceGatheringTimeout: this._holdIceGatheringTimeoutMs()
+    };
     if (this._holdIceRestartEnabled()) {
       reInviteOptions.offerOptions = { iceRestart: true };
-    } else {
-      delete reInviteOptions.offerOptions;
     }
     this.session.sessionDescriptionHandlerOptionsReInvite = reInviteOptions;
+    this.session.sessionDescriptionHandlerModifiersReInvite = holdModifiers;
+    const failHold = (message) => {
+      this.isOnHold = previous;
+      this._restoreTransceiverHoldDirection(previous);
+      this._applyLocalHoldState(previous);
+      this.emit("hold-changed", { onHold: this.isOnHold, pending: false });
+      return new Error(message || "Hold failed");
+    };
     try {
       await new Promise((resolve, reject) => {
-        this.session.invite({
+        let settled = false;
+        const finish = (fn, value) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          fn(value);
+        };
+        const timer = setTimeout(() => {
+          finish(reject, failHold("Hold request timed out"));
+        }, Math.max(8e3, this._holdIceGatheringTimeoutMs() + 5e3));
+        const invitePromise = this.session.invite({
+          sessionDescriptionHandlerOptions: reInviteOptions,
+          sessionDescriptionHandlerModifiers: holdModifiers,
           requestDelegate: {
             onAccept: () => {
-              this.isOnHold = !!onHold;
-              this._applyLocalHoldState(!!onHold);
+              if (!this._holdRenegotiationSucceeded(wantHold)) {
+                finish(reject, failHold(
+                  wantHold ? "Hold renegotiation failed (bad answer SDP)" : "Resume renegotiation failed (bad answer SDP)"
+                ));
+                return;
+              }
+              this.isOnHold = wantHold;
+              this._applyLocalHoldState(wantHold);
               try {
                 this._attachRemoteFromSession(this.session);
               } catch {
               }
-              this.emit("hold-changed", { onHold: this.isOnHold });
-              resolve(this.isOnHold);
+              this.emit("hold-changed", { onHold: this.isOnHold, pending: false });
+              finish(resolve, this.isOnHold);
             },
             onReject: (response) => {
-              this.isOnHold = previous;
-              this._applyLocalHoldState(previous);
-              this.emit("hold-changed", { onHold: this.isOnHold });
               const code = response?.message?.statusCode || response?.statusCode;
-              reject(new Error(code ? `Hold request rejected: ${code}` : "Hold request rejected"));
+              finish(reject, failHold(
+                code ? `Hold request rejected: ${code}` : "Hold request rejected"
+              ));
             }
           }
-        }).catch(reject);
+        });
+        Promise.resolve(invitePromise).catch((err) => {
+          const message = String(err?.message || err || "");
+          if (/already in progress|RequestPending/i.test(message)) {
+            finish(reject, failHold("Hold request already in progress"));
+            return;
+          }
+          finish(reject, failHold(message || "Hold failed"));
+        });
       });
     } catch (err) {
-      this.isOnHold = previous;
-      this._applyLocalHoldState(previous);
-      this.emit("hold-changed", { onHold: this.isOnHold });
+      if (this._holdInProgress) {
+        if (this.isOnHold !== previous) {
+          this.isOnHold = previous;
+          this._restoreTransceiverHoldDirection(previous);
+          this._applyLocalHoldState(previous);
+          this.emit("hold-changed", { onHold: this.isOnHold, pending: false });
+        } else {
+          this.emit("hold-changed", { onHold: this.isOnHold, pending: false });
+        }
+      }
       const message = String(err?.message || err || "");
       if (/already in progress|RequestPending/i.test(message)) {
         throw new Error("Hold request already in progress");
@@ -1039,11 +1499,16 @@ function installTabLeader(sdk, options = {}) {
     mirroredReg = {
       online: !!state.online,
       user: state.user || mirroredReg.user || "",
-      error: state.error
+      error: state.error,
+      status: state.status || (state.online ? "online" : state.reason === "unregistered" ? "offline" : "register-failed"),
+      reason: state.reason
     };
     if (role === "leader" && sdk.core?.userAgent) {
       sdk.core.isRegistered = !!mirroredReg.online;
       sdk.core._lastRegisterError = mirroredReg.online ? "" : String(mirroredReg.error || sdk.core._lastRegisterError || "");
+      if (typeof sdk.core._intentionallyUnregistered === "boolean") {
+        sdk.core._intentionallyUnregistered = mirroredReg.status === "offline";
+      }
     }
   }
   function hasLiveSipRegistration() {
@@ -1133,9 +1598,26 @@ function installTabLeader(sdk, options = {}) {
       return;
     }
     Promise.resolve().then(async () => {
-      if (name !== "register" && name !== "unregister" && wantRegistered) {
+      if (name === "register") {
+        wantRegistered = true;
+        return ensureLeaderRegistered();
+      }
+      if (name === "unregister") {
+        wantRegistered = false;
+        return originals.unregister.apply(sdk, Array.isArray(args) ? args : []);
+      }
+      if (name === "toggleRegistration") {
         const reg = readLocalRegistration();
-        if (!reg?.online && name !== "toggleRegistration") {
+        if (reg?.online) {
+          wantRegistered = false;
+          return originals.unregister.apply(sdk, []);
+        }
+        wantRegistered = true;
+        return ensureLeaderRegistered();
+      }
+      if (wantRegistered) {
+        const reg = readLocalRegistration();
+        if (!reg?.online) {
           await ensureLeaderRegistered();
         }
       }
@@ -1292,15 +1774,39 @@ function installTabLeader(sdk, options = {}) {
       if (typeof sdk[name] !== "function") continue;
       originals[name] = sdk[name].bind(sdk);
       if (name === "register") {
-        sdk.register = async () => {
+        sdk.register = async (...args) => {
           wantRegistered = true;
           post({ type: "hello" });
           post({ type: "request-state" });
-          const result = await waitUntilReady();
-          if (role !== "leader") {
-            sdk.core?.emit?.("registration-changed", { ...mirroredReg });
+          if (role === "leader") {
+            return ensureLeaderRegistered();
           }
-          return result;
+          await sleep(60);
+          if (role === "leader") {
+            return ensureLeaderRegistered();
+          }
+          if (mirroredReg.online) {
+            sdk.core?.emit?.("registration-changed", { ...mirroredReg });
+            return { ...mirroredReg, role: "follower" };
+          }
+          try {
+            const result = await sendCommand("register", args);
+            applyMirroredRegistration(result || { online: true });
+            sdk.core?.emit?.("registration-changed", { ...mirroredReg });
+            return { ...mirroredReg, role: role === "leader" ? "leader" : "follower" };
+          } catch (err) {
+            const waited = await waitUntilReady();
+            if (waited?.online) return waited;
+            const error = String(err?.message || err || waited?.error || "Register failed");
+            applyMirroredRegistration({
+              online: false,
+              user: mirroredReg.user,
+              error,
+              status: "register-failed"
+            });
+            sdk.core?.emit?.("registration-changed", { ...mirroredReg });
+            throw new Error(error);
+          }
         };
         continue;
       }
@@ -1308,11 +1814,15 @@ function installTabLeader(sdk, options = {}) {
         sdk.unregister = async (...args) => {
           wantRegistered = false;
           if (role === "leader") {
-            const out = await originals.unregister(...args);
+            const out2 = await originals.unregister(...args);
+            applyMirroredRegistration(out2 || { online: false, status: "offline", reason: "unregistered" });
             broadcastState();
-            return out;
+            return out2;
           }
-          return sendCommand("unregister", args);
+          const out = await sendCommand("unregister", args);
+          applyMirroredRegistration(out || { online: false, status: "offline", reason: "unregistered" });
+          sdk.core?.emit?.("registration-changed", { ...mirroredReg });
+          return out;
         };
         continue;
       }
@@ -1408,8 +1918,7 @@ var PHONE_CONFIG_DEFAULTS = Object.freeze({
   EnableBuddies: true,
   EnableMultiTabLeader: true,
   ServerPath: "/ws",
-  MaxDidLength: 24,
-  HoldMode: "sip"
+  MaxDidLength: 24
 });
 var PHONE_UI_FRAME_SIZE = Object.freeze({
   width: "250px",
@@ -1450,7 +1959,8 @@ var REMOVED_KEYS = Object.freeze([
   "DisableBuddies",
   "multiTabLeader",
   "serverPath",
-  "WSSPATH"
+  "WSSPATH",
+  "HoldMode"
 ]);
 function normalizePhoneConfig(input = {}) {
   const source = input && typeof input === "object" ? input : {};
@@ -1467,6 +1977,11 @@ function normalizePhoneConfig(input = {}) {
     delete out[key];
   }
   out.EnableRingtone = true;
+  if (out.IncomingHeaders !== void 0) {
+    const raw = out.IncomingHeaders;
+    const list = Array.isArray(raw) ? raw : typeof raw === "string" ? raw.split(/[\s,]+/) : [];
+    out.IncomingHeaders = list.map((name) => String(name || "").trim()).filter(Boolean);
+  }
   return out;
 }
 function readStorageValue(key) {
@@ -1532,33 +2047,64 @@ async function resolveStoredSipPassword(raw) {
 async function persistSipPassword(plain) {
   if (typeof window === "undefined" || !window.localStorage) return false;
   const value = String(plain ?? "");
+  const desktop = !!desktopSecretApi();
   if (!value) {
     writeStorageValue("Password", "");
+    return desktop;
+  }
+  if (await isSecretStorageAvailable()) {
+    const api = desktopSecretApi();
+    const cipher = await api.encryptSecret(value);
+    writeStorageValue("Password", `${SECRET_STORAGE_PREFIX}${cipher}`);
     return true;
   }
-  if (!await isSecretStorageAvailable()) {
+  if (desktop) {
     writeStorageValue("Password", value);
-    return false;
+    return true;
   }
-  const api = desktopSecretApi();
-  const cipher = await api.encryptSecret(value);
-  writeStorageValue("Password", `${SECRET_STORAGE_PREFIX}${cipher}`);
-  return true;
+  return false;
 }
+var WEB_MEMORY_ONLY_KEYS = /* @__PURE__ */ new Set([
+  "Password",
+  "PasswordType",
+  "Username",
+  "Server",
+  "Port",
+  "Domain",
+  "ServerPath",
+  "profileName"
+]);
 function configFromStorage() {
   if (typeof window === "undefined" || !window.localStorage) return {};
+  const electron = !!desktopSecretApi();
   const config = {};
   for (const key of STORAGE_KEYS) {
     const value = readStorageValue(key);
     if (!value) continue;
-    if (key === "Password" && isEncryptedSecret(value)) continue;
+    if (key === "Password") continue;
+    if (!electron && WEB_MEMORY_ONLY_KEYS.has(key)) continue;
     config[key] = value;
   }
   return config;
 }
+function mergeHostAndStorageConfig(hostConfig = {}) {
+  const stored = configFromStorage();
+  const host = hostConfig && typeof hostConfig === "object" ? { ...hostConfig } : {};
+  const merged = { ...stored, ...host };
+  if (desktopSecretApi()) {
+    for (const key of STORAGE_KEYS) {
+      if (key === "Password") continue;
+      const fromStore = stored[key];
+      const fromHost = host[key];
+      const hostEmpty = fromHost === void 0 || fromHost === null || String(fromHost).trim() === "";
+      if (fromStore && hostEmpty) merged[key] = fromStore;
+    }
+  }
+  return normalizePhoneConfig(merged);
+}
 var PhoneSDK = class {
   constructor(config = {}, deps = {}) {
-    const mergedConfig = normalizePhoneConfig({ ...configFromStorage(), ...config || {} });
+    const mergedConfig = mergeHostAndStorageConfig(config || {});
     if (isEncryptedSecret(mergedConfig.Password)) delete mergedConfig.Password;
     this.core = deps.core || new PhoneCore(mergedConfig, deps);
     this._tabLeaderController = null;
@@ -1574,25 +2120,29 @@ var PhoneSDK = class {
     return this._tabLeaderController || null;
   }
   /**
-   * Load Password from encrypted localStorage (or migrate plaintext),
-   * then apply it to the live SIP config before register().
+   * Normalize in-memory Password for register().
+   * Electron may also load OS-encrypted storage; web embed never reads Password from localStorage.
    */
   async hydrateSecrets() {
-    const raw = readStorageValue("Password") || null;
-    const storageValue = raw ? await resolveStoredSipPassword(raw) : "";
     const configValue = this.core?.config?.Password;
     const configPassword = configValue && !isEncryptedSecret(configValue) ? String(configValue) : "";
-    const storedType = readStorageValue("PasswordType") || null;
+    let storageValue = "";
+    let storedType = null;
+    if (!configPassword && desktopSecretApi()) {
+      const raw = readStorageValue("Password") || null;
+      storageValue = raw ? await resolveStoredSipPassword(raw) : "";
+      storedType = readStorageValue("PasswordType") || null;
+    }
     const fromConfig = !!configPassword;
     const password = configPassword || storageValue || "";
     const type = fromConfig ? this.core?.config?.PasswordType || "" : storedType || this.core?.config?.PasswordType || "";
     const auth = normalizeSipPasswordAndType(password, type);
     if (auth.password) {
       this.configure({ Password: auth.password, PasswordType: auth.type });
-      const needsPersist = !raw || !isEncryptedSecret(raw) || !!configPassword && configPassword !== storageValue;
-      if (needsPersist && await isSecretStorageAvailable()) {
+      if (await isSecretStorageAvailable()) {
         try {
           await persistSipPassword(auth.password);
+          writeStorageValue("PasswordType", auth.type || "ha1");
         } catch {
         }
       }
@@ -1652,6 +2202,15 @@ var PhoneSDK = class {
   }
   warmMedia(constraints) {
     return this.core.warmMedia?.(constraints);
+  }
+  async ensureMediaAccess(constraints) {
+    const ensure = this.core?.media?.ensureMediaAccess;
+    if (typeof ensure !== "function") {
+      const err = new Error("Media devices unavailable");
+      err.name = "NotAllowedError";
+      throw err;
+    }
+    return ensure.call(this.core.media, constraints);
   }
   sendDTMF(digits, options) {
     return this.core.sendDTMF(digits, options);
@@ -1717,6 +2276,8 @@ var FALLBACK_TEXT = {
     speaker: "Speaker:",
     ringDevice: "Ring Device:",
     microphone: "Microphone:",
+    micPermissionDenied: "Microphone permission required. Allow access and try again.",
+    mediaPermissionFailed: "Could not access microphone/camera.",
     camera: "Camera:",
     save: "Save",
     cancel: "Cancel",
@@ -1758,6 +2319,7 @@ var FALLBACK_TEXT = {
     searchPlaceholder: "Search",
     onlineShort: "Online",
     offlineShort: "Offline",
+    registerFailedShort: "Register failed",
     answered: "Answered",
     missed: "Missed",
     outgoing: "Outgoing",
@@ -1842,6 +2404,8 @@ var FALLBACK_TEXT = {
     speaker: "Loa:",
     ringDevice: "Thi\u1EBFt b\u1ECB chu\xF4ng:",
     microphone: "Micro:",
+    micPermissionDenied: "C\u1EA7n quy\u1EC1n micro. H\xE3y cho ph\xE9p r\u1ED3i th\u1EED l\u1EA1i.",
+    mediaPermissionFailed: "Kh\xF4ng truy c\u1EADp \u0111\u01B0\u1EE3c micro/camera.",
     camera: "Camera:",
     save: "L\u01B0u",
     cancel: "H\u1EE7y",
@@ -1883,6 +2447,7 @@ var FALLBACK_TEXT = {
     searchPlaceholder: "T\xECm ki\u1EBFm",
     onlineShort: "Tr\u1EF1c tuy\u1EBFn",
     offlineShort: "Ngo\u1EA1i tuy\u1EBFn",
+    registerFailedShort: "\u0110\u0103ng k\xFD l\u1ED7i",
     answered: "\u0110\xE3 tr\u1EA3 l\u1EDDi",
     missed: "Nh\u1EE1",
     outgoing: "G\u1ECDi \u0111i",
@@ -2194,27 +2759,37 @@ var DomRenderer = class {
   setStatus(text) {
     if (this.refs.status) this.refs.status.textContent = text;
   }
-  setRegistrationState({ online, user, error } = {}) {
+  setRegistrationState({ online, user, error, status } = {}) {
     const regText = this.root.querySelector("#mobileRegText");
     const regDot = this.root.querySelector("#mobileRegDot");
     const regLink = this.root.querySelector("#reglink");
     const deregLink = this.root.querySelector("#dereglink");
     const userCallId = this.root.querySelector("#UserCallID");
+    const resolvedStatus = status || (online ? "online" : error ? "register-failed" : "offline");
     if (online) this.lastRegistrationError = "";
     else if (error !== void 0 && error !== null && String(error).trim()) {
       this.lastRegistrationError = String(error).trim();
     }
     const errorText = this.lastRegistrationError || "";
-    const statusLabel = online ? this.dndActive ? this.statusDndLabel || this.statusOnlineLabel || "Do Not Disturb" : this.statusOnlineLabel || "Online" : errorText || this.statusOfflineLabel || "Offline";
+    let statusLabel;
+    if (online || resolvedStatus === "online") {
+      statusLabel = this.dndActive ? this.statusDndLabel || this.statusOnlineLabel || "Do Not Disturb" : this.statusOnlineLabel || "Online";
+    } else if (resolvedStatus === "register-failed") {
+      statusLabel = errorText || this.statusRegisterFailedLabel || "Register failed";
+    } else {
+      statusLabel = this.statusOfflineLabel || "Offline";
+    }
     const identity = String(user || "").trim();
     if (regText) {
       regText.textContent = identity ? `${identity} \u2022 ${statusLabel}` : statusLabel;
       regText.title = regText.textContent;
     }
     if (regDot) {
-      regDot.className = online ? this.dndActive ? "dotOnline dotDnd" : "dotOnline" : "dotOffline";
+      regDot.className = online ? this.dndActive ? "dotOnline dotDnd" : "dotOnline" : resolvedStatus === "register-failed" ? "dotOffline dotRegisterFailed" : "dotOffline";
     }
-    if (regLink) regLink.className = online ? "dotOnline" : "dotOffline";
+    if (regLink) {
+      regLink.className = online ? "dotOnline" : resolvedStatus === "register-failed" ? "dotOffline dotRegisterFailed" : "dotOffline";
+    }
     if (deregLink) deregLink.style.display = online ? "" : "none";
     if (userCallId && identity) userCallId.textContent = identity;
   }
@@ -2323,7 +2898,7 @@ function buildCallerDisplay(number, contactName, callerIdName) {
   if (normalizedNumber && primary !== normalizedNumber) secondary = normalizedNumber;
   return { primary, secondary, number: normalizedNumber, name: primary };
 }
-var _PhoneUI_instances, openProfileMenu_fn, profileMenuItem_fn, popupHost_fn, closeProfileMenu_fn, confirmInPanel_fn, closePanelConfirm_fn, handleProfileMenuAction_fn, getDevices_fn, openSettings_fn, renderConfigExtension_fn, bindConfigPanel_fn, saveConfigPanel_fn, switchSelectedDevice_fn, reconnectLastCall_fn, transferCall_fn, startConference_fn, setBottomTabsVisible_fn, showActionPanel_fn, callPeerHtml_fn, resolveCallPeer_fn, renderIncomingCall_fn, renderCallProgress_fn, renderActiveCall_fn, startCallTimer_fn, stopCallTimer_fn, tickCallTimer_fn, callLabel_fn, bindCallSurfaceControls_fn, isPanelVisible_fn, syncInCallOverlayState_fn, showTransferPanel_fn, hideTransferPanel_fn, submitTransferFromPanel_fn, showConferencePanel_fn, hideConferencePanel_fn, submitConferenceFromPanel_fn, showDtmfPanel_fn, hideDtmfPanel_fn, openInCallDeviceMenu_fn, openPresentMenu_fn, selectPresentSource_fn, deleteDialDigit_fn, bindTabButtons_fn, switchTab_fn, restoreActiveTab_fn, toggleDialpadSetting_fn, bindDialpadInputState_fn, bindDialpadDigits_fn, syncDialDeleteKeyState_fn, hideLoadingOverlay_fn, bindSearchInputState_fn, renderTabContent_fn, renderDialpad_fn, maxDidLength_fn, maxContactNameLength_fn, clampDialValue_fn, renderContacts_fn, recentGroupKey_fn, groupRecents_fn, isNumberInContacts_fn, copyTextToClipboard_fn, showToast_fn, recentCallSideLabel_fn, renderRecents_fn, bindRecentExpandedActions_fn, closeAllContactMenus_fn, bindContactExpandedActions_fn, deleteContactById_fn, handleClearTab_fn, applySavedAudioPreferences_fn, resolveRingtoneUrl_fn, startFallbackRinger_fn, stopFallbackRinger_fn, startRingtone_fn, stopRingtoneAudioElement_fn, stopRingtone_fn, getDbItem_fn, normalizeLanguage_fn, loadLanguagePack_fn, t_fn, applyLanguageToStaticLabels_fn, applyFeatureVisibility_fn, registrationDisplayUser_fn, getBoolConfig_fn, buddyStorageKey_fn, loadBuddyCollection_fn, saveBuddyCollection_fn, loadContactsFromStorage_fn, buildContactLookup_fn, loadRecentsFromStorage_fn, getRecentCallStatus_fn, parseRecentDate_fn, formatRecentClock_fn, formatRecentDay_fn, formatRecentDayKey_fn, formatBillsec_fn, toEpoch_fn, saveRecentFromCurrentCall_fn, deleteRecentById_fn, deleteRecentGroup_fn, clearAllRecents_fn, addContact_fn, updateContact_fn, promptAddContact_fn, hideAddContactSheet_fn, showAddContactPanel_fn, saveAddContactForm_fn, clearAllContacts_fn, toggleRegistration_fn;
+var _PhoneUI_instances, statusHoldActive_fn, mediaErrorStatus_fn, showMediaError_fn, flashActionError_fn, requestMediaForCall_fn, rejectIncomingForMedia_fn, answerCall_fn, openProfileMenu_fn, profileMenuItem_fn, popupHost_fn, closeProfileMenu_fn, confirmInPanel_fn, closePanelConfirm_fn, handleProfileMenuAction_fn, getDevices_fn, openSettings_fn, renderConfigExtension_fn, bindConfigPanel_fn, saveConfigPanel_fn, switchSelectedDevice_fn, syncHoldButtons_fn, runHoldAction_fn, reconnectLastCall_fn, transferCall_fn, startConference_fn, setBottomTabsVisible_fn, restoreIdleUi_fn, showActionPanel_fn, callPeerHtml_fn, resolveCallPeer_fn, renderIncomingCall_fn, renderCallProgress_fn, renderActiveCall_fn, startCallTimer_fn, stopCallTimer_fn, tickCallTimer_fn, callLabel_fn, bindCallSurfaceControls_fn, isPanelVisible_fn, syncInCallOverlayState_fn, showTransferPanel_fn, hideTransferPanel_fn, submitTransferFromPanel_fn, showConferencePanel_fn, hideConferencePanel_fn, submitConferenceFromPanel_fn, showDtmfPanel_fn, hideDtmfPanel_fn, openInCallDeviceMenu_fn, openPresentMenu_fn, selectPresentSource_fn, deleteDialDigit_fn, bindTabButtons_fn, switchTab_fn, restoreActiveTab_fn, defaultDialpadToggles_fn, loadDialpadToggles_fn, saveDialpadToggles_fn, applyDialpadTogglesUi_fn, bindDialpadTogglesSync_fn, toggleDialpadSetting_fn, bindDialpadInputState_fn, bindDialpadDigits_fn, syncDialDeleteKeyState_fn, hideLoadingOverlay_fn, bindSearchInputState_fn, renderTabContent_fn, renderDialpad_fn, maxDidLength_fn, maxContactNameLength_fn, clampDialValue_fn, renderContacts_fn, recentGroupKey_fn, groupRecents_fn, isNumberInContacts_fn, copyTextToClipboard_fn, showToast_fn, recentCallSideLabel_fn, renderRecents_fn, bindRecentExpandedActions_fn, closeAllContactMenus_fn, bindContactExpandedActions_fn, deleteContactById_fn, handleClearTab_fn, applySavedAudioPreferences_fn, resolveRingtoneUrl_fn, startFallbackRinger_fn, stopFallbackRinger_fn, startRingtone_fn, stopRingtoneAudioElement_fn, stopRingtone_fn, getDbItem_fn, normalizeLanguage_fn, loadLanguagePack_fn, t_fn, applyLanguageToStaticLabels_fn, applyFeatureVisibility_fn, registrationDisplayUser_fn, getBoolConfig_fn, buddyStorageKey_fn, loadBuddyCollection_fn, saveBuddyCollection_fn, loadContactsFromStorage_fn, buildContactLookup_fn, loadRecentsFromStorage_fn, getRecentCallStatus_fn, parseRecentDate_fn, formatRecentClock_fn, formatRecentDay_fn, formatRecentDayKey_fn, formatBillsec_fn, toEpoch_fn, saveRecentFromCurrentCall_fn, deleteRecentById_fn, deleteRecentGroup_fn, clearAllRecents_fn, addContact_fn, updateContact_fn, promptAddContact_fn, hideAddContactSheet_fn, showAddContactPanel_fn, saveAddContactForm_fn, clearAllContacts_fn, toggleRegistration_fn;
 var PhoneUI = class {
   constructor({ root, sdk, config = {}, deps = {} } = {}) {
     __privateAdd(this, _PhoneUI_instances);
@@ -2377,7 +2952,7 @@ var PhoneUI = class {
     this._ringtoneFallbackTimer = null;
     this.language = __privateMethod(this, _PhoneUI_instances, normalizeLanguage_fn).call(this, __privateMethod(this, _PhoneUI_instances, getDbItem_fn).call(this, "Language", this.config.Language || "vi"));
     this.langPack = {};
-    this.dialpadToggles = { auto: false, cw: true, dnd: false, rec: false };
+    this.dialpadToggles = __privateMethod(this, _PhoneUI_instances, loadDialpadToggles_fn).call(this);
     this.activeTab = "dialpad";
     this.tabSearch = { contacts: "", recents: "", dialpad: "" };
     this.callConnected = false;
@@ -2393,16 +2968,21 @@ var PhoneUI = class {
     this.currentCallLog = null;
     this.callTimerStartedAt = null;
     this.callTimerInterval = null;
+    this._statusHoldUntil = 0;
+    this._statusHoldText = "";
+    this._mediaErrorBannerTimer = 0;
   }
   mount() {
+    const runCallAction = (fn) => {
+      void Promise.resolve().then(() => fn()).catch((err) => {
+        __privateMethod(this, _PhoneUI_instances, showMediaError_fn).call(this, err, "Call failed");
+      });
+    };
     bindControls(this.root, {
-      onCall: () => this.call(),
-      onCallAudio: () => this.call({ video: false }),
-      onCallVideo: () => this.call({ video: true }),
-      onAnswer: () => {
-        __privateMethod(this, _PhoneUI_instances, stopRingtone_fn).call(this);
-        return this.sdk.answer();
-      },
+      onCall: () => runCallAction(() => this.call()),
+      onCallAudio: () => runCallAction(() => this.call({ video: false })),
+      onCallVideo: () => runCallAction(() => this.call({ video: true })),
+      onAnswer: () => runCallAction(() => __privateMethod(this, _PhoneUI_instances, answerCall_fn).call(this)),
       onHangup: () => {
         __privateMethod(this, _PhoneUI_instances, stopRingtone_fn).call(this);
         return this.sdk.hangup();
@@ -2436,6 +3016,7 @@ var PhoneUI = class {
     __privateMethod(this, _PhoneUI_instances, bindTabButtons_fn).call(this);
     __privateMethod(this, _PhoneUI_instances, bindDialpadInputState_fn).call(this);
     __privateMethod(this, _PhoneUI_instances, bindDialpadDigits_fn).call(this);
+    __privateMethod(this, _PhoneUI_instances, bindDialpadTogglesSync_fn).call(this);
     __privateMethod(this, _PhoneUI_instances, bindSearchInputState_fn).call(this);
     __privateMethod(this, _PhoneUI_instances, bindRecentExpandedActions_fn).call(this);
     __privateMethod(this, _PhoneUI_instances, bindContactExpandedActions_fn).call(this);
@@ -2470,9 +3051,7 @@ var PhoneUI = class {
       __privateMethod(this, _PhoneUI_instances, startRingtone_fn).call(this);
       if (this.dialpadToggles.auto) {
         window.setTimeout(() => {
-          this.sdk.answer?.().catch((err) => {
-            this.renderer.setStatus(`Answer failed: ${String(err?.message || err)}`);
-          });
+          void __privateMethod(this, _PhoneUI_instances, answerCall_fn).call(this);
         }, 0);
       }
     });
@@ -2515,21 +3094,23 @@ var PhoneUI = class {
       __privateMethod(this, _PhoneUI_instances, stopCallTimer_fn).call(this);
       this.notifications.clear();
       __privateMethod(this, _PhoneUI_instances, saveRecentFromCurrentCall_fn).call(this);
-      this.callConnected = false;
-      this.activeCall = null;
-      this.currentCallLog = null;
-      __privateMethod(this, _PhoneUI_instances, setBottomTabsVisible_fn).call(this, true);
-      this.renderer.showTab(this.activeTab || "dialpad");
-      __privateMethod(this, _PhoneUI_instances, renderTabContent_fn).call(this, this.activeTab || "dialpad");
+      __privateMethod(this, _PhoneUI_instances, restoreIdleUi_fn).call(this);
       const regState2 = this.sdk.getRegistrationState?.() || {};
       this.renderer.setRegistrationState({
         ...regState2,
         user: __privateMethod(this, _PhoneUI_instances, registrationDisplayUser_fn).call(this, regState2.user)
       });
+      if (__privateMethod(this, _PhoneUI_instances, statusHoldActive_fn).call(this) && this._statusHoldText) {
+        this.renderer.setStatus(this._statusHoldText);
+        __privateMethod(this, _PhoneUI_instances, flashActionError_fn).call(this, this._statusHoldText);
+        return;
+      }
       if (regState2.online) {
         this.renderer.setStatus(this.dialpadToggles.dnd ? __privateMethod(this, _PhoneUI_instances, t_fn).call(this, "doNotDisturb") : __privateMethod(this, _PhoneUI_instances, t_fn).call(this, "online"));
+      } else if (regState2.status === "register-failed" || regState2.error) {
+        this.renderer.setStatus(regState2.error || __privateMethod(this, _PhoneUI_instances, t_fn).call(this, "registerFailed"));
       } else {
-        this.renderer.setStatus(regState2.error ? "Reg Error" : __privateMethod(this, _PhoneUI_instances, t_fn).call(this, "offline"));
+        this.renderer.setStatus(__privateMethod(this, _PhoneUI_instances, t_fn).call(this, "offline"));
       }
     });
     this.sdk.on("mute-changed", ({ muted }) => {
@@ -2539,29 +3120,32 @@ var PhoneUI = class {
       if (mute) mute.style.display = muted ? "none" : "";
       if (unmute) unmute.style.display = muted ? "" : "none";
     });
-    this.sdk.on("hold-changed", ({ onHold }) => {
-      this.renderer.setStatus(onHold ? __privateMethod(this, _PhoneUI_instances, t_fn).call(this, "onHold") : __privateMethod(this, _PhoneUI_instances, t_fn).call(this, "resumed"));
-      const hold = this.root.querySelector("#line-1-btn-Hold");
-      const resume = this.root.querySelector("#line-1-btn-Unhold");
-      if (hold) hold.style.display = onHold ? "none" : "";
-      if (resume) resume.style.display = onHold ? "" : "none";
+    this.sdk.on("hold-changed", ({ onHold, pending } = {}) => {
+      __privateMethod(this, _PhoneUI_instances, syncHoldButtons_fn).call(this, !!onHold, !!pending);
+      if (!pending) {
+        this.renderer.setStatus(onHold ? __privateMethod(this, _PhoneUI_instances, t_fn).call(this, "onHold") : __privateMethod(this, _PhoneUI_instances, t_fn).call(this, "resumed"));
+      }
     });
     this.sdk.on("local-stream", (stream) => this.renderer.attachMedia("local", stream));
     this.sdk.on("remote-stream", (stream) => this.renderer.attachMedia("remote", stream));
-    this.sdk.on("registration-changed", ({ online, user, error } = {}) => {
+    this.sdk.on("registration-changed", ({ online, user, error, status } = {}) => {
       const displayUser = __privateMethod(this, _PhoneUI_instances, registrationDisplayUser_fn).call(this, user);
       if (displayUser && displayUser !== "default") this.profileUserID = displayUser;
-      this.renderer.setRegistrationState({ online, user: displayUser, error });
+      this.renderer.setRegistrationState({ online, user: displayUser, error, status });
+      if (__privateMethod(this, _PhoneUI_instances, statusHoldActive_fn).call(this)) return;
       if (online) {
         this.renderer.setStatus(this.dialpadToggles.dnd ? __privateMethod(this, _PhoneUI_instances, t_fn).call(this, "doNotDisturb") : __privateMethod(this, _PhoneUI_instances, t_fn).call(this, "online"));
         void this.sdk.warmMedia?.({ audio: true, video: false });
-      } else {
+      } else if (status === "register-failed" || error) {
         const errText = String(error || this.renderer.lastRegistrationError || "").trim();
-        this.renderer.setStatus(errText || __privateMethod(this, _PhoneUI_instances, t_fn).call(this, "offline"));
+        this.renderer.setStatus(errText || __privateMethod(this, _PhoneUI_instances, t_fn).call(this, "registerFailed"));
+      } else {
+        this.renderer.setStatus(__privateMethod(this, _PhoneUI_instances, t_fn).call(this, "offline"));
       }
     });
     this.renderer.statusOnlineLabel = __privateMethod(this, _PhoneUI_instances, t_fn).call(this, "onlineShort");
     this.renderer.statusOfflineLabel = __privateMethod(this, _PhoneUI_instances, t_fn).call(this, "offlineShort");
+    this.renderer.statusRegisterFailedLabel = __privateMethod(this, _PhoneUI_instances, t_fn).call(this, "registerFailedShort");
     this.renderer.statusDndLabel = __privateMethod(this, _PhoneUI_instances, t_fn).call(this, "doNotDisturb");
     this.renderer.dndActive = !!this.dialpadToggles.dnd;
     this.renderer.onTabRendered = () => {
@@ -2597,6 +3181,19 @@ var PhoneUI = class {
       return;
     }
     const dialTarget = __privateMethod(this, _PhoneUI_instances, clampDialValue_fn).call(this, String(target));
+    const callType = options.callType || (options.video ? "video" : "audio");
+    const wantVideo = !!(options.video || callType === "video");
+    const callOptions = {
+      video: wantVideo,
+      extraHeaders: Array.isArray(options.extraHeaders) ? options.extraHeaders : void 0,
+      constraints: options.constraints
+    };
+    try {
+      await __privateMethod(this, _PhoneUI_instances, requestMediaForCall_fn).call(this, { video: wantVideo, constraints: options.constraints });
+    } catch (err) {
+      __privateMethod(this, _PhoneUI_instances, showMediaError_fn).call(this, err, "Call failed");
+      return;
+    }
     const peer = __privateMethod(this, _PhoneUI_instances, resolveCallPeer_fn).call(this, dialTarget, { displayName: "" });
     this.activeCall = {
       direction: "outgoing",
@@ -2614,20 +3211,10 @@ var PhoneUI = class {
     __privateMethod(this, _PhoneUI_instances, renderCallProgress_fn).call(this, dialTarget);
     this.renderer.setStatus(`Calling ${peer.name || dialTarget}`);
     try {
-      const callType = options.callType || (options.video ? "video" : "audio");
-      const callOptions = {
-        video: !!(options.video || callType === "video"),
-        extraHeaders: Array.isArray(options.extraHeaders) ? options.extraHeaders : void 0,
-        constraints: options.constraints
-      };
       await this.sdk.call(dialTarget, callOptions);
     } catch (err) {
-      this.renderer.setStatus(`Call failed: ${String(err?.message || err)}`);
-      this.callConnected = false;
-      this.activeCall = null;
-      this.currentCallLog = null;
-      this.renderer.showTab(this.activeTab || "dialpad");
-      __privateMethod(this, _PhoneUI_instances, renderTabContent_fn).call(this, this.activeTab || "dialpad");
+      __privateMethod(this, _PhoneUI_instances, showMediaError_fn).call(this, err, "Call failed");
+      __privateMethod(this, _PhoneUI_instances, restoreIdleUi_fn).call(this);
     }
   }
   /** Host click-to-call entry (postMessage / parent API). */
@@ -2641,11 +3228,125 @@ var PhoneUI = class {
     });
   }
   async toggleHold() {
-    if (this.sdk.isOnHold?.()) return this.sdk.resume();
-    return this.sdk.hold();
+    if (this.sdk.isOnHold?.()) return __privateMethod(this, _PhoneUI_instances, runHoldAction_fn).call(this, () => this.sdk.resume());
+    return __privateMethod(this, _PhoneUI_instances, runHoldAction_fn).call(this, () => this.sdk.hold());
   }
 };
 _PhoneUI_instances = new WeakSet();
+statusHoldActive_fn = function() {
+  return Number(this._statusHoldUntil || 0) > Date.now();
+};
+mediaErrorStatus_fn = function(err, fallbackPrefix = "Error") {
+  const name = String(err?.name || "");
+  const raw = String(err?.message || err || "").trim();
+  if (name === "NotAllowedError" || name === "PermissionDeniedError" || /permission|not allowed|denied|microphone/i.test(raw)) {
+    return __privateMethod(this, _PhoneUI_instances, t_fn).call(this, "micPermissionDenied");
+  }
+  if (name === "NotFoundError" || name === "DevicesNotFoundError") {
+    return __privateMethod(this, _PhoneUI_instances, t_fn).call(this, "mediaPermissionFailed");
+  }
+  return raw ? `${fallbackPrefix}: ${raw}` : __privateMethod(this, _PhoneUI_instances, t_fn).call(this, "mediaPermissionFailed");
+};
+showMediaError_fn = function(err, fallbackPrefix = "Error") {
+  const text = __privateMethod(this, _PhoneUI_instances, mediaErrorStatus_fn).call(this, err, fallbackPrefix);
+  this._statusHoldText = text;
+  this._statusHoldUntil = Date.now() + 8e3;
+  this.renderer.setStatus(text);
+  try {
+    console.warn("VPhone media:", err);
+  } catch {
+  }
+  __privateMethod(this, _PhoneUI_instances, flashActionError_fn).call(this, text);
+  return text;
+};
+flashActionError_fn = function(text) {
+  if (typeof document === "undefined") return;
+  const host = this.root.querySelector("#actionArea") || this.root;
+  if (!host) return;
+  let banner = host.querySelector("[data-role='media-error-banner']");
+  if (!banner) {
+    banner = document.createElement("div");
+    banner.setAttribute("data-role", "media-error-banner");
+    banner.style.cssText = [
+      "margin:8px 10px 0",
+      "padding:8px 10px",
+      "border-radius:8px",
+      "background:#3f1d1d",
+      "color:#fecaca",
+      "font-size:12px",
+      "line-height:1.35",
+      "border:1px solid #7f1d1d",
+      "position:relative",
+      "z-index:5"
+    ].join(";");
+    host.insertBefore(banner, host.firstChild);
+  }
+  banner.textContent = text;
+  banner.style.display = "";
+  if (typeof window !== "undefined") {
+    window.clearTimeout(this._mediaErrorBannerTimer);
+    this._mediaErrorBannerTimer = window.setTimeout(() => {
+      if (banner && banner.parentNode) banner.style.display = "none";
+    }, 8e3);
+  }
+};
+requestMediaForCall_fn = async function({ video = false, constraints } = {}) {
+  const mediaConstraints = {
+    audio: true,
+    video: !!video,
+    ...constraints && typeof constraints === "object" ? constraints : {}
+  };
+  const stream = await this.sdk.ensureMediaAccess(mediaConstraints);
+  const liveAudio = stream?.getAudioTracks?.().filter((track) => track.readyState === "live") || [];
+  if (!liveAudio.length) {
+    throw Object.assign(new Error("Microphone permission required"), { name: "NotAllowedError" });
+  }
+  return stream;
+};
+rejectIncomingForMedia_fn = async function(reasonPhrase = "Microphone unavailable") {
+  try {
+    if (typeof this.sdk.reject === "function") {
+      await this.sdk.reject({ statusCode: 486, reasonPhrase });
+      return;
+    }
+  } catch {
+  }
+  try {
+    this.sdk.hangup?.();
+  } catch {
+  }
+};
+answerCall_fn = async function(options = {}) {
+  __privateMethod(this, _PhoneUI_instances, stopRingtone_fn).call(this);
+  const wantVideo = !!options.video;
+  try {
+    await __privateMethod(this, _PhoneUI_instances, requestMediaForCall_fn).call(this, { video: wantVideo, constraints: options.constraints });
+  } catch (err) {
+    __privateMethod(this, _PhoneUI_instances, showMediaError_fn).call(this, err, "Answer failed");
+    await __privateMethod(this, _PhoneUI_instances, rejectIncomingForMedia_fn).call(this, "Microphone unavailable");
+    if (this.root.querySelector(".vphoneCallScreen")) {
+      __privateMethod(this, _PhoneUI_instances, restoreIdleUi_fn).call(this);
+    }
+    if (this._statusHoldText) {
+      this.renderer.setStatus(this._statusHoldText);
+      __privateMethod(this, _PhoneUI_instances, flashActionError_fn).call(this, this._statusHoldText);
+    }
+    return;
+  }
+  try {
+    await this.sdk.answer(options);
+  } catch (err) {
+    __privateMethod(this, _PhoneUI_instances, showMediaError_fn).call(this, err, "Answer failed");
+    await __privateMethod(this, _PhoneUI_instances, rejectIncomingForMedia_fn).call(this, "Answer failed");
+    if (this.root.querySelector(".vphoneCallScreen")) {
+      __privateMethod(this, _PhoneUI_instances, restoreIdleUi_fn).call(this);
+    }
+    if (this._statusHoldText) {
+      this.renderer.setStatus(this._statusHoldText);
+      __privateMethod(this, _PhoneUI_instances, flashActionError_fn).call(this, this._statusHoldText);
+    }
+  }
+};
 openProfileMenu_fn = function(anchor) {
   if (this.profileMenu && this.profileMenu.getAttribute("data-role") === "profile-menu") {
     __privateMethod(this, _PhoneUI_instances, closeProfileMenu_fn).call(this);
@@ -2900,6 +3601,12 @@ bindConfigPanel_fn = function(mode) {
       } catch {
       }
       try {
+        if (typeof window !== "undefined" && typeof window.VPhoneDesktop?.clearPhoneAccount === "function") {
+          await window.VPhoneDesktop.clearPhoneAccount();
+        }
+      } catch {
+      }
+      try {
         await this.sdk.unregister?.();
       } catch {
       }
@@ -2920,8 +3627,10 @@ bindConfigPanel_fn = function(mode) {
     message: __privateMethod(this, _PhoneUI_instances, t_fn).call(this, "confirmResetSettings"),
     confirmText: __privateMethod(this, _PhoneUI_instances, t_fn).call(this, "resetSettings"),
     onConfirm: async () => {
-      ["AudioOutputId", "AudioSrcId", "RingOutputId", "VideoSrcId", "Language", "NoiseSuppression", "EchoCancellation", "AutoGainControl"].forEach((key) => this.localDB?.removeItem(key));
+      ["AudioOutputId", "AudioSrcId", "RingOutputId", "VideoSrcId", "Language", "NoiseSuppression", "EchoCancellation", "AutoGainControl", "DialpadToggles"].forEach((key) => this.localDB?.removeItem(key));
       this.language = __privateMethod(this, _PhoneUI_instances, normalizeLanguage_fn).call(this, this.config.Language || "vi");
+      this.dialpadToggles = __privateMethod(this, _PhoneUI_instances, loadDialpadToggles_fn).call(this);
+      __privateMethod(this, _PhoneUI_instances, applyDialpadTogglesUi_fn).call(this);
       __privateMethod(this, _PhoneUI_instances, applySavedAudioPreferences_fn).call(this);
       await __privateMethod(this, _PhoneUI_instances, loadLanguagePack_fn).call(this, this.language);
       await __privateMethod(this, _PhoneUI_instances, renderConfigExtension_fn).call(this, "settings");
@@ -2939,7 +3648,7 @@ saveConfigPanel_fn = async function(mode) {
     if (!domain && server) domain = server;
     const username = valueOf("#Configure_Account_Username");
     const rawPassword = valueOf("#Configure_Account_Password");
-    const inputType = this.config.PasswordType || readStorageValue("PasswordType") || "";
+    const inputType = this.config.PasswordType || "";
     const storedAuth = prepareSipPasswordForStorage(rawPassword, {
       username,
       realm: domain,
@@ -2955,20 +3664,36 @@ saveConfigPanel_fn = async function(mode) {
       Password: storedAuth.password,
       PasswordType: storedAuth.type
     });
-    Object.entries(nextConfig).forEach(([key, value]) => {
-      if (key === "Password" || key === "EnableRingtone") return;
-      if (["Server", "Port", "ServerPath", "profileName", "Domain", "Username", "PasswordType"].includes(key)) {
-        writeStorageValue(key, value);
-      }
-    });
-    await persistSipPassword(nextConfig.Password);
-    writeStorageValue("PasswordType", nextConfig.PasswordType || "ha1");
     Object.assign(this.config, nextConfig);
     this.profileName = nextConfig.profileName || this.profileName;
     this.profileUserID = nextConfig.Username || this.profileUserID;
     try {
       this.localDB?.setItem("profileUserID", this.profileUserID);
     } catch {
+    }
+    if (typeof window !== "undefined" && window.VPhoneDesktop) {
+      const account = {
+        Server: nextConfig.Server || "",
+        Port: nextConfig.Port || "",
+        ServerPath: nextConfig.ServerPath || "",
+        Domain: nextConfig.Domain || "",
+        Username: nextConfig.Username || "",
+        PasswordType: nextConfig.PasswordType || "",
+        profileName: nextConfig.profileName || ""
+      };
+      for (const [key, value] of Object.entries(account)) {
+        writeStorageValue(key, value);
+      }
+      try {
+        await persistSipPassword(nextConfig.Password || "");
+      } catch {
+      }
+      try {
+        if (typeof window.VPhoneDesktop.savePhoneAccount === "function") {
+          await window.VPhoneDesktop.savePhoneAccount(account);
+        }
+      } catch {
+      }
     }
     try {
       await this.sdk.unregister?.();
@@ -3020,6 +3745,32 @@ switchSelectedDevice_fn = async function(kind, selector) {
   if (!deviceId || typeof this.sdk.switchDevice !== "function") return;
   await this.sdk.switchDevice(kind, deviceId);
 };
+syncHoldButtons_fn = function(onHold, pending = false) {
+  const hold = this.root.querySelector("#line-1-btn-Hold");
+  const resume = this.root.querySelector("#line-1-btn-Unhold");
+  if (hold) {
+    hold.style.display = onHold ? "none" : "";
+    hold.disabled = !!pending;
+  }
+  if (resume) {
+    resume.style.display = onHold ? "" : "none";
+    resume.disabled = !!pending;
+  }
+};
+runHoldAction_fn = async function(action) {
+  if (this._holdUiBusy) return;
+  this._holdUiBusy = true;
+  __privateMethod(this, _PhoneUI_instances, syncHoldButtons_fn).call(this, !!this.sdk.isOnHold?.(), true);
+  try {
+    await action();
+  } catch (err) {
+    __privateMethod(this, _PhoneUI_instances, syncHoldButtons_fn).call(this, !!this.sdk.isOnHold?.(), false);
+    this.renderer.setStatus(`Hold failed: ${String(err?.message || err)}`);
+  } finally {
+    this._holdUiBusy = false;
+    __privateMethod(this, _PhoneUI_instances, syncHoldButtons_fn).call(this, !!this.sdk.isOnHold?.(), false);
+  }
+};
 reconnectLastCall_fn = async function() {
   if (typeof this.sdk.reconnect !== "function") {
     this.renderer.setStatus("Reconnect not supported");
@@ -3065,6 +3816,17 @@ setBottomTabsVisible_fn = function(visible) {
   phone.classList.toggle("phoneModalOpen", !visible);
   const tabBar = this.root.querySelector("#bottomTabBar");
   if (tabBar) tabBar.style.display = visible ? "" : "none";
+};
+/** Leave call/config overlay and restore header + bottom tabs. */
+restoreIdleUi_fn = function() {
+  this.callConnected = false;
+  this.activeCall = null;
+  this.currentCallLog = null;
+  __privateMethod(this, _PhoneUI_instances, setBottomTabsVisible_fn).call(this, true);
+  const action = this.root.querySelector("#actionArea");
+  if (action) action.classList.remove("configOverlayPane");
+  this.renderer.showTab(this.activeTab || "dialpad");
+  __privateMethod(this, _PhoneUI_instances, renderTabContent_fn).call(this, this.activeTab || "dialpad");
 };
 showActionPanel_fn = function(html, { coverTabs = false } = {}) {
   const host = this.root.querySelector("#actionArea");
@@ -3267,7 +4029,9 @@ bindCallSurfaceControls_fn = function() {
     const target = event.target;
     if (!(target instanceof Element)) return;
     if (target.closest(".callAnswerAudio")) {
-      this.sdk.answer();
+      void __privateMethod(this, _PhoneUI_instances, answerCall_fn).call(this, { video: false }).catch((err) => {
+        __privateMethod(this, _PhoneUI_instances, showMediaError_fn).call(this, err, "Answer failed");
+      });
       return;
     }
     if (target.closest(".callReject") || target.closest(".callHangup")) {
@@ -3291,15 +4055,11 @@ bindCallSurfaceControls_fn = function() {
       return;
     }
     if (target.closest(".callHold")) {
-      void this.sdk.hold?.().catch((err) => {
-        this.renderer.setStatus(`Hold failed: ${String(err?.message || err)}`);
-      });
+      void __privateMethod(this, _PhoneUI_instances, runHoldAction_fn).call(this, () => this.sdk.hold?.());
       return;
     }
     if (target.closest(".callResume")) {
-      void this.sdk.resume?.().catch((err) => {
-        this.renderer.setStatus(`Resume failed: ${String(err?.message || err)}`);
-      });
+      void __privateMethod(this, _PhoneUI_instances, runHoldAction_fn).call(this, () => this.sdk.resume?.());
       return;
     }
     if (target.closest(".callTransfer")) {
@@ -3649,25 +4409,83 @@ restoreActiveTab_fn = function() {
   }
   __privateMethod(this, _PhoneUI_instances, switchTab_fn).call(this, tab);
 };
-toggleDialpadSetting_fn = function(key) {
-  if (!key || !(key in this.dialpadToggles)) return;
-  this.dialpadToggles[key] = !this.dialpadToggles[key];
-  const btn = this.root.querySelector(`#dialpad-toggle-${key}`);
-  if (btn) {
-    btn.classList.toggle("toggleOn", this.dialpadToggles[key]);
+defaultDialpadToggles_fn = function() {
+  return { auto: false, cw: true, dnd: false, rec: false };
+};
+loadDialpadToggles_fn = function() {
+  const defaults = __privateMethod(this, _PhoneUI_instances, defaultDialpadToggles_fn).call(this);
+  const raw = __privateMethod(this, _PhoneUI_instances, getDbItem_fn).call(this, "DialpadToggles", "");
+  if (!raw) return { ...defaults };
+  try {
+    const parsed = typeof raw === "string" ? JSON.parse(raw) : null;
+    if (!parsed || typeof parsed !== "object") return { ...defaults };
+    return {
+      auto: parsed.auto === true || parsed.auto === "1" || parsed.auto === 1,
+      cw: parsed.cw === void 0 ? defaults.cw : !(parsed.cw === false || parsed.cw === "0" || parsed.cw === 0),
+      dnd: parsed.dnd === true || parsed.dnd === "1" || parsed.dnd === 1,
+      rec: parsed.rec === true || parsed.rec === "1" || parsed.rec === 1
+    };
+  } catch {
+    return { ...defaults };
+  }
+};
+saveDialpadToggles_fn = function() {
+  if (!this.localDB) return;
+  try {
+    this.localDB.setItem("DialpadToggles", JSON.stringify({
+      auto: !!this.dialpadToggles.auto,
+      cw: !!this.dialpadToggles.cw,
+      dnd: !!this.dialpadToggles.dnd,
+      rec: !!this.dialpadToggles.rec
+    }));
+  } catch {
+  }
+};
+applyDialpadTogglesUi_fn = function({ announce = false, changedKey = "" } = {}) {
+  for (const key of Object.keys(this.dialpadToggles || {})) {
+    const btn = this.root?.querySelector?.(`#dialpad-toggle-${key}`);
+    if (!btn) continue;
+    btn.classList.toggle("toggleOn", !!this.dialpadToggles[key]);
     btn.classList.toggle("toggleOff", !this.dialpadToggles[key]);
   }
-  if (key === "dnd") {
-    this.renderer.dndActive = !!this.dialpadToggles.dnd;
-    const regState = this.sdk.getRegistrationState?.() || {};
+  this.renderer.dndActive = !!this.dialpadToggles.dnd;
+  const regState = this.sdk.getRegistrationState?.() || {};
+  if (regState.online) {
     this.renderer.setRegistrationState({
       ...regState,
       user: __privateMethod(this, _PhoneUI_instances, registrationDisplayUser_fn).call(this, regState.user)
     });
-    this.renderer.setStatus(this.dialpadToggles.dnd ? __privateMethod(this, _PhoneUI_instances, t_fn).call(this, "doNotDisturb") : __privateMethod(this, _PhoneUI_instances, t_fn).call(this, "online"));
-    return;
+    if (!__privateMethod(this, _PhoneUI_instances, statusHoldActive_fn).call(this)) {
+      this.renderer.setStatus(this.dialpadToggles.dnd ? __privateMethod(this, _PhoneUI_instances, t_fn).call(this, "doNotDisturb") : __privateMethod(this, _PhoneUI_instances, t_fn).call(this, "online"));
+    }
   }
-  this.renderer.setStatus(`${key.toUpperCase()} ${this.dialpadToggles[key] ? "On" : "Off"}`);
+  if (announce && changedKey && changedKey !== "dnd") {
+    this.renderer.setStatus(
+      `${changedKey.toUpperCase()} ${this.dialpadToggles[changedKey] ? "On" : "Off"}`
+    );
+  }
+};
+bindDialpadTogglesSync_fn = function() {
+  if (typeof window === "undefined" || this._dialpadTogglesSyncBound) return;
+  this._dialpadTogglesSyncBound = true;
+  this._onDialpadTogglesStorage = (event) => {
+    if (!event || event.storageArea !== this.localDB) return;
+    if (event.key != null && event.key !== "DialpadToggles") return;
+    const next = __privateMethod(this, _PhoneUI_instances, loadDialpadToggles_fn).call(this);
+    const prev = this.dialpadToggles || {};
+    if (!!next.auto === !!prev.auto && !!next.cw === !!prev.cw && !!next.dnd === !!prev.dnd && !!next.rec === !!prev.rec) {
+      return;
+    }
+    this.dialpadToggles = next;
+    __privateMethod(this, _PhoneUI_instances, applyDialpadTogglesUi_fn).call(this);
+  };
+  window.addEventListener("storage", this._onDialpadTogglesStorage);
+};
+toggleDialpadSetting_fn = function(key) {
+  if (!key || !(key in this.dialpadToggles)) return;
+  this.dialpadToggles[key] = !this.dialpadToggles[key];
+  __privateMethod(this, _PhoneUI_instances, saveDialpadToggles_fn).call(this);
+  __privateMethod(this, _PhoneUI_instances, applyDialpadTogglesUi_fn).call(this, { announce: true, changedKey: key });
 };
 bindDialpadInputState_fn = function() {
   const dialText = this.root.querySelector("#dialText");
@@ -4363,6 +5181,7 @@ applyLanguageToStaticLabels_fn = function() {
   };
   this.renderer.statusOnlineLabel = __privateMethod(this, _PhoneUI_instances, t_fn).call(this, "onlineShort");
   this.renderer.statusOfflineLabel = __privateMethod(this, _PhoneUI_instances, t_fn).call(this, "offlineShort");
+  this.renderer.statusRegisterFailedLabel = __privateMethod(this, _PhoneUI_instances, t_fn).call(this, "registerFailedShort");
   this.renderer.statusDndLabel = __privateMethod(this, _PhoneUI_instances, t_fn).call(this, "doNotDisturb");
   this.renderer.dndActive = !!this.dialpadToggles.dnd;
   setDataLabel("#tab-dialpad", "dialpad");
@@ -4825,39 +5644,55 @@ toggleRegistration_fn = async function() {
     this.renderer.setStatus("Register toggle not supported");
     return;
   }
+  const applyState = (state = {}) => {
+    const displayUser = __privateMethod(this, _PhoneUI_instances, registrationDisplayUser_fn).call(this, state.user);
+    this.renderer.setRegistrationState({ ...state, user: displayUser });
+    if (__privateMethod(this, _PhoneUI_instances, statusHoldActive_fn).call(this)) return;
+    if (state.online) {
+      this.renderer.setStatus(this.dialpadToggles.dnd ? __privateMethod(this, _PhoneUI_instances, t_fn).call(this, "doNotDisturb") : __privateMethod(this, _PhoneUI_instances, t_fn).call(this, "online"));
+    } else if (state.status === "register-failed" || state.error) {
+      this.renderer.setStatus(String(state.error || __privateMethod(this, _PhoneUI_instances, t_fn).call(this, "registerFailed")));
+    } else {
+      this.renderer.setStatus(__privateMethod(this, _PhoneUI_instances, t_fn).call(this, "offline"));
+    }
+  };
   try {
-    const state = await this.sdk.toggleRegistration();
-    this.renderer.setRegistrationState({
-      ...state || {},
-      user: __privateMethod(this, _PhoneUI_instances, registrationDisplayUser_fn).call(this, state?.user)
-    });
-    this.renderer.setStatus(state?.online ? __privateMethod(this, _PhoneUI_instances, t_fn).call(this, "online") : __privateMethod(this, _PhoneUI_instances, t_fn).call(this, "offline"));
+    this.renderer.setStatus(__privateMethod(this, _PhoneUI_instances, t_fn).call(this, "registering"));
+    const current = this.sdk.getRegistrationState?.() || {};
+    let state;
+    if (current.online) {
+      state = await this.sdk.unregister?.();
+    } else {
+      try {
+        await this.sdk.hydrateSecrets?.();
+      } catch {
+      }
+      state = await this.sdk.register?.();
+    }
+    applyState(state || this.sdk.getRegistrationState?.() || {});
   } catch (err) {
-    this.renderer.setStatus(`Register toggle failed: ${String(err?.message || err)}`);
+    const failed = this.sdk.getRegistrationState?.() || {
+      online: false,
+      status: "register-failed",
+      error: String(err?.message || err || __privateMethod(this, _PhoneUI_instances, t_fn).call(this, "registerFailed"))
+    };
+    applyState(failed);
   }
 };
 function createPhoneWidget({ root, config = {}, deps = {} } = {}) {
   const mountRoot = root || document.getElementById("Phone") || document.body;
   const normalizedConfig = normalizePhoneConfig(config);
   const sdk = deps.sdk || new PhoneSDK(normalizedConfig, deps);
-  const ui = new PhoneUI({ root: mountRoot, sdk, config: normalizedConfig, deps });
+  const uiConfig = normalizePhoneConfig({
+    ...normalizedConfig,
+    ...sdk.core?.config && typeof sdk.core.config === "object" ? sdk.core.config : {}
+  });
+  const ui = new PhoneUI({ root: mountRoot, sdk, config: uiConfig, deps });
   ui.mount();
   sdk.bindAudioElements?.({
     remoteEl: mountRoot.querySelector("[data-role='remote-media']"),
     localEl: mountRoot.querySelector("[data-role='local-media']")
   });
-  const onHostMessage = (event) => {
-    const msg = event?.data;
-    if (!msg || typeof msg !== "object") return;
-    if (msg.action !== "makeCall") return;
-    const data = msg.data && typeof msg.data === "object" ? msg.data : msg;
-    void ui.makeCallFromHost(data).catch((err) => {
-      ui.renderer?.setStatus?.(`Call failed: ${String(err?.message || err)}`);
-    });
-  };
-  if (typeof window !== "undefined") {
-    window.addEventListener("message", onHostMessage);
-  }
   const postToHost = (message) => {
     try {
       if (typeof window === "undefined") return;
@@ -4868,18 +5703,52 @@ function createPhoneWidget({ root, config = {}, deps = {} } = {}) {
     } catch {
     }
   };
+  const applyHostConfig = async (partial = {}) => {
+    const next = normalizePhoneConfig(partial && typeof partial === "object" ? partial : {});
+    Object.assign(ui.config, next);
+    try {
+      sdk.configure?.(next);
+    } catch {
+    }
+    if (sdk.core?._intentionallyUnregistered) return;
+    try {
+      const password = await sdk.hydrateSecrets?.();
+      if (password) ui.config.Password = password;
+      await sdk.register?.();
+    } catch {
+    }
+  };
+  const onHostMessage = (event) => {
+    const msg = event?.data;
+    if (!msg || typeof msg !== "object") return;
+    if (msg.action === "configure") {
+      const data2 = msg.data && typeof msg.data === "object" ? msg.data : {};
+      void applyHostConfig(data2);
+      return;
+    }
+    if (msg.action !== "makeCall") return;
+    const data = msg.data && typeof msg.data === "object" ? msg.data : msg;
+    void ui.makeCallFromHost(data).catch((err) => {
+      ui.renderer?.setStatus?.(`Call failed: ${String(err?.message || err)}`);
+    });
+  };
+  if (typeof window !== "undefined") {
+    window.addEventListener("message", onHostMessage);
+  }
   const hostUnsubs = [];
   const onHostEvent = (eventName, handler) => {
     sdk.on?.(eventName, handler);
     hostUnsubs.push(() => sdk.off?.(eventName, handler));
   };
-  onHostEvent("registration-changed", ({ online, user, error } = {}) => {
+  onHostEvent("registration-changed", ({ online, user, error, status, reason } = {}) => {
+    const resolved = status || (online ? "online" : reason === "unregistered" ? "offline" : "register-failed");
     postToHost({
       type: "vphone-status",
       online: !!online,
       user: user || "",
       error: error || "",
-      status: online ? "online" : "offline"
+      status: resolved,
+      reason: reason || ""
     });
   });
   onHostEvent("incoming-call", (call = {}) => {
@@ -4889,7 +5758,8 @@ function createPhoneWidget({ root, config = {}, deps = {} } = {}) {
         phase: "incoming",
         from: call.from || "",
         displayName: call.displayName || "",
-        number: call.from || ""
+        number: call.number || "",
+        headers: call.headers && typeof call.headers === "object" ? call.headers : {}
       }
     });
   });
@@ -4915,18 +5785,25 @@ function createPhoneWidget({ root, config = {}, deps = {} } = {}) {
     try {
       const password = await sdk.hydrateSecrets?.();
       if (password) ui.config.Password = password;
+      if (sdk.core?.config && typeof sdk.core.config === "object") {
+        Object.assign(ui.config, sdk.core.config);
+        if (password) ui.config.Password = password;
+      }
     } catch {
     }
     try {
       await sdk.register?.();
-    } catch (err) {
-      sdk.emitRegistrationChanged?.({ online: false, error: String(err?.message || err) });
+    } catch {
+      if (!String(sdk.core?.config?.Password || ui.config?.Password || "").trim()) {
+        postToHost({ type: "vphone-credentials-required" });
+      }
     }
   })();
   return {
     sdk,
     ui,
     ready,
+    configure: (partial) => applyHostConfig(partial),
     makeCall: (numberToDial, options = {}) => ui.makeCallFromHost({
       numberToDial,
       ...options && typeof options === "object" ? options : {},

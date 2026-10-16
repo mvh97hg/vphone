@@ -263,9 +263,26 @@ export function installTabLeader(sdk, options = {}) {
     }
     Promise.resolve()
       .then(async () => {
-        if (name !== "register" && name !== "unregister" && wantRegistered) {
+        if (name === "register") {
+          wantRegistered = true;
+          return ensureLeaderRegistered();
+        }
+        if (name === "unregister") {
+          wantRegistered = false;
+          return originals.unregister.apply(sdk, Array.isArray(args) ? args : []);
+        }
+        if (name === "toggleRegistration") {
           const reg = readLocalRegistration();
-          if (!reg?.online && name !== "toggleRegistration") {
+          if (reg?.online) {
+            wantRegistered = false;
+            return originals.unregister.apply(sdk, []);
+          }
+          wantRegistered = true;
+          return ensureLeaderRegistered();
+        }
+        if (wantRegistered) {
+          const reg = readLocalRegistration();
+          if (!reg?.online) {
             await ensureLeaderRegistered();
           }
         }
@@ -443,15 +460,46 @@ export function installTabLeader(sdk, options = {}) {
       originals[name] = sdk[name].bind(sdk);
 
       if (name === "register") {
-        sdk.register = async () => {
+        sdk.register = async (...args) => {
           wantRegistered = true;
           post({ type: "hello" });
           post({ type: "request-state" });
-          const result = await waitUntilReady();
-          if (role !== "leader") {
-            sdk.core?.emit?.("registration-changed", { ...mirroredReg });
+
+          if (role === "leader") {
+            return ensureLeaderRegistered();
           }
-          return result;
+
+          // Give the leader a moment to answer request-state when already online.
+          await sleep(60);
+          if (role === "leader") {
+            return ensureLeaderRegistered();
+          }
+          if (mirroredReg.online) {
+            sdk.core?.emit?.("registration-changed", { ...mirroredReg });
+            return { ...mirroredReg, role: "follower" };
+          }
+
+          // Non-leader must ask the SIP leader to REGISTER — waiting alone caused
+          // "Waiting for leader tab" / fail when the leader was intentionally offline.
+          try {
+            const result = await sendCommand("register", args);
+            applyMirroredRegistration(result || { online: true });
+            sdk.core?.emit?.("registration-changed", { ...mirroredReg });
+            return { ...mirroredReg, role: role === "leader" ? "leader" : "follower" };
+          } catch (err) {
+            // Leader may be electing / closed — fall back to wait / takeover.
+            const waited = await waitUntilReady();
+            if (waited?.online) return waited;
+            const error = String(err?.message || err || waited?.error || "Register failed");
+            applyMirroredRegistration({
+              online: false,
+              user: mirroredReg.user,
+              error,
+              status: "register-failed"
+            });
+            sdk.core?.emit?.("registration-changed", { ...mirroredReg });
+            throw new Error(error);
+          }
         };
         continue;
       }
@@ -461,10 +509,14 @@ export function installTabLeader(sdk, options = {}) {
           wantRegistered = false;
           if (role === "leader") {
             const out = await originals.unregister(...args);
+            applyMirroredRegistration(out || { online: false, status: "offline", reason: "unregistered" });
             broadcastState();
             return out;
           }
-          return sendCommand("unregister", args);
+          const out = await sendCommand("unregister", args);
+          applyMirroredRegistration(out || { online: false, status: "offline", reason: "unregistered" });
+          sdk.core?.emit?.("registration-changed", { ...mirroredReg });
+          return out;
         };
         continue;
       }

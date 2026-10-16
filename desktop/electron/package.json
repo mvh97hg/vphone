@@ -1,19 +1,19 @@
 {
   "name": "vphone",
-  "version": "26.5.23",
+  "version": "26.10.16",
   "private": true,
   "description": "VPhone - VoIP softphone application",
   "main": "main.js",
   "scripts": {
     "set:version:build": "node scripts/set-build-version.cjs",
-    "build:desktop": "node scripts/build-desktop.cjs",
+    "build:desktop": "node scripts/ensure-build-icons.cjs && node scripts/build-desktop.cjs",
     "start": "pnpm run build:desktop && electron .",
     "test:register": "node scripts/register-smoke.cjs",
-    "package": "pnpm run set:version:build && pnpm run build:desktop && electron-builder --dir",
-    "dist": "pnpm run set:version:build && pnpm run build:desktop && electron-builder",
-    "dist:win": "pnpm run set:version:build && pnpm run build:desktop && electron-builder --win",
-    "dist:nsis": "pnpm run set:version:build && pnpm run build:desktop && electron-builder --win nsis",
-    "dist:portable": "pnpm run set:version:build && pnpm run build:desktop && electron-builder --win portable",
+    "package": "pnpm run set:version:build && pnpm run build:desktop && electron-builder --win --dir && node scripts/finalize-dir-portable.cjs",
+    "dist": "pnpm run package",
+    "dist:win": "pnpm run package",
+    "dist:portable": "pnpm run package",
+    "dist:nsis": "pnpm run set:version:build && pnpm run build:desktop && electron-builder --win nsis && node scripts/finalize-dir-portable.cjs --nsis",
     "dist:mac": "pnpm run set:version:build && pnpm run build:desktop && electron-builder --mac"
   },
   "vphone": {
@@ -38,26 +38,29 @@
     }
   },
   "build": {
-    "appId": "com.vphone.app",
+    "appId": "com.vphone.softphone",
     "productName": "VPhone",
     "executableName": "VPhone",
     "copyright": "Copyright © 2026 VPhone",
     "asar": true,
     "npmRebuild": false,
     "buildDependenciesFromSource": false,
-    "afterPack": "scripts/prune-locales.cjs",
+    "afterPack": "scripts/after-pack.cjs",
+    "afterSign": "scripts/after-sign.cjs",
     "directories": {
-      "output": "release"
+      "output": "release/_pack-26.10.16.1337",
+      "buildResources": "build"
     },
+    "icon": "icon.ico",
     "win": {
-      "icon": "icons/win/icon.ico",
+      "icon": "icon.ico",
+      "signAndEditExecutable": true,
       "target": [
-        "nsis",
-        "portable"
+        "dir"
       ]
     },
     "mac": {
-      "icon": "icons/mac/icon.icns",
+      "icon": "icon.icns",
       "target": [
         "dmg",
         "zip"
@@ -65,29 +68,48 @@
       "category": "public.app-category.productivity"
     },
     "nsis": {
+      "guid": "24035e53-71a1-5f93-9697-a417c79850c6",
       "oneClick": false,
       "perMachine": false,
       "allowElevation": false,
       "allowToChangeInstallationDirectory": true,
       "displayLanguageSelector": true,
-      "installerIcon": "icons/win/icon.ico",
-      "uninstallerIcon": "icons/win/icon.ico",
-      "installerHeaderIcon": "icons/win/icon.ico",
+      "include": "installer.nsh",
+      "installerIcon": "icon.ico",
+      "uninstallerIcon": "icon.ico",
+      "installerHeaderIcon": "icon.ico",
       "installerLanguages": [
         "vi_VN",
         "en_US"
       ],
       "createDesktopShortcut": true,
-      "createStartMenuShortcut": true
+      "createStartMenuShortcut": true,
+      "artifactName": "VPhone-Setup-26.10.16.1337.${ext}"
     },
+    "portable": {
+      "artifactName": "VPhone-26.10.16.1337-win"
+    },
+    "asarUnpack": [
+      "icons/**",
+      "**/koffi/**",
+      "**/*.node"
+    ],
+    "extraFiles": [
+      {
+        "from": "build/icon.ico",
+        "to": "VPhone.ico"
+      }
+    ],
     "files": [
       "**/*",
+      "icons/**/*",
       "vendor/**/*",
       "renderer/vendor/**/*",
       "!.env",
       "!.env.*",
       "!*.log",
       "!release/**",
+      "!build/**",
       "!**/*.map",
       "!playwright",
       "!renderer/src/**",
@@ -96,19 +118,25 @@
     "extraMetadata": {
       "main": "main.js"
     },
-    "artifactName": "VPhone Setup 26.05.23.1720.${ext}"
+    "artifactName": "VPhone-26.10.16.1337.${ext}"
   },
   "devDependencies": {
     "electron": "^41.2.1",
     "electron-builder": "^26.0.12",
     "esbuild": "^0.25.12",
-    "playwright": "^1.60.0"
+    "playwright": "^1.60.0",
+    "resedit": "^3.1.0"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
       "electron",
       "electron-builder",
-      "esbuild"
+      "esbuild",
+      "koffi"
     ]
+  },
+  "dependencies": {
+    "@koromix/koffi-win32-x64": "3.3.3",
+    "koffi": "^3.3.3"
   }
 }

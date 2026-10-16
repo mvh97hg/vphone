@@ -41,6 +41,8 @@ node_modules/
 lib/node_modules/
 desktop/electron/node_modules/
 desktop/electron/release/
+desktop/electron/.vscode/
+desktop/electron/build/
 desktop/electron/_tmp_*
 desktop/electron/*.log
 desktop/electron/*.exe
